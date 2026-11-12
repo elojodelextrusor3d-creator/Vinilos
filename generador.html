@@ -73,6 +73,23 @@
   .cinfo { font-size:.85rem; color:var(--fg); }
   .cinfo code { color:#ffd27a; }
 
+  /* Etiqueta para imprimir */
+  details.print { border-top:1px solid var(--line); padding-top:10px; }
+  details.print summary { cursor:pointer; font-weight:700; padding:6px 0; list-style:none; }
+  details.print summary::-webkit-details-marker { display:none; }
+  details.print summary::after { content:" ▸"; color:var(--muted); }
+  details.print[open] summary::after { content:" ▾"; }
+  .pbody { display:flex; flex-direction:column; gap:10px; margin-top:8px; }
+  .pgrid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .pgrid label { display:flex; flex-direction:column; gap:4px; }
+  .pgrid input {
+    width:100%; padding:10px 12px; border-radius:10px; border:1px solid var(--line);
+    background:#1b1b1f; color:var(--fg); font-size:1rem;
+  }
+  .seg button { background:#1b1b1f; border:1px solid var(--line); }
+  .seg button.on { background:var(--c); border-color:transparent; color:#fff; }
+  .pprev { width:170px; height:170px; align-self:center; }
+
   /* Mis llaveros */
   .hint { margin:0; color:var(--muted); font-size:.85rem; }
   .item { display:flex; flex-direction:column; gap:8px; padding:12px; border-radius:12px; background:#101013; }
@@ -123,6 +140,30 @@
         <button class="copyFull">Copiar link completo</button>
         <a class="btn test" target="_blank" rel="noopener">Probar</a>
       </div>
+
+      <details class="print">
+        <summary>🖨 Etiqueta para imprimir</summary>
+        <div class="pbody">
+          <div class="pgrid">
+            <label>Diámetro (mm)<input type="number" class="pd" min="10" max="200" step="0.5" value="30"></label>
+            <label>Cantidad<input type="number" class="pq" min="1" max="200" step="1" value="1"></label>
+          </div>
+          <label>Estilo</label>
+          <div class="row seg">
+            <button class="pst" data-st="cover">Solo portada</button>
+            <button class="pst" data-st="vinyl">Vinilo completo</button>
+          </div>
+          <label class="chk"><input type="checkbox" class="phole"> Agujero en el centro</label>
+          <label class="chk"><input type="checkbox" class="pcut"> Línea de corte (con 1 mm de sangrado)</label>
+          <canvas class="pprev" width="400" height="400"></canvas>
+          <div class="small pnote"></div>
+          <div class="row">
+            <button class="main pprint">🖨 Imprimir</button>
+            <button class="ppng">⬇ Descargar PNG</button>
+          </div>
+          <div class="small">Al imprimir elegí tamaño <b>100 % / real</b>, sin “ajustar a la página”.</div>
+        </div>
+      </details>
     </div>
   </template>
 
@@ -286,6 +327,87 @@
     };
   }
 
+  // ---------- etiqueta para imprimir ----------
+  const PKEY = "vinilos.impresion";
+  const DPI = 600, BLEED = 1;
+  function loadPrintCfg() {
+    const def = { d: 30, q: 1, st: "cover", hole: false, cut: true };
+    try { return Object.assign(def, JSON.parse(localStorage.getItem(PKEY)) || {}); } catch { return def; }
+  }
+  function savePrintCfg(cfg) { try { localStorage.setItem(PKEY, JSON.stringify(cfg)); } catch {} }
+
+  function loadImg(src, cors) {
+    return new Promise((res, rej) => {
+      const i = new Image();
+      if (cors) i.crossOrigin = "anonymous";
+      i.onload = () => res(i); i.onerror = rej; i.src = src;
+    });
+  }
+
+  // recorte cuadrado de la imagen (las miniaturas de YouTube traen franjas negras)
+  function srcRect(s) {
+    const w = s.img.naturalWidth || s.img.width, h = s.img.naturalHeight || s.img.height;
+    const side = s.yt ? Math.min(w * 9 / 16, h) : Math.min(w, h);
+    return [(w - side) / 2, (h - side) / 2, side, side];
+  }
+
+  function renderLabel(s, st, hole, N, accent) {
+    const c = document.createElement("canvas");
+    c.width = c.height = N;
+    const x = c.getContext("2d"), R = N / 2, TAU = Math.PI * 2;
+    const drawImg = r => {
+      if (s && s.img) {
+        const [sx, sy, sw, sh] = srcRect(s);
+        x.drawImage(s.img, sx, sy, sw, sh, R - r, R - r, 2 * r, 2 * r);
+      } else { x.fillStyle = accent; x.fillRect(R - r, R - r, 2 * r, 2 * r); }
+    };
+    x.save();
+    x.beginPath(); x.arc(R, R, R, 0, TAU); x.clip();
+    if (st === "cover") {
+      drawImg(R);
+    } else {
+      x.fillStyle = "#141417"; x.fillRect(0, 0, N, N);
+      x.strokeStyle = "rgba(255,255,255,.08)"; x.lineWidth = Math.max(1, N / 450);
+      for (let r = R * 0.42; r < R * 0.97; r += R / 32) { x.beginPath(); x.arc(R, R, r, 0, TAU); x.stroke(); }
+      if (x.createConicGradient) {
+        const g = x.createConicGradient(0, R, R), z = "rgba(255,255,255,0)", l = "rgba(255,255,255,.13)";
+        [[0, z], [.08, l], [.16, z], [.5, z], [.58, l], [.66, z], [1, z]].forEach(([p, col]) => g.addColorStop(p, col));
+        x.fillStyle = g; x.fillRect(0, 0, N, N);
+      }
+      const lr = R * 0.38;
+      x.save(); x.beginPath(); x.arc(R, R, lr, 0, TAU); x.clip(); drawImg(lr); x.restore();
+      x.beginPath(); x.arc(R, R, lr, 0, TAU); x.lineWidth = R * 0.03; x.strokeStyle = accent; x.stroke();
+    }
+    if (hole) {
+      x.beginPath(); x.arc(R, R, R * (st === "cover" ? 0.07 : 0.045), 0, TAU);
+      x.fillStyle = "#fff"; x.fill();
+      x.lineWidth = Math.max(1, R * 0.01); x.strokeStyle = "rgba(0,0,0,.35)"; x.stroke();
+    }
+    x.restore();
+    return c;
+  }
+
+  function openPrintSheet(blobUrl, d, q, cut, title) {
+    const b = cut ? BLEED : 0, W = d + 2 * b;
+    const w = window.open("", "_blank");
+    if (!w) { alert("El navegador bloqueó la ventana. Permití las ventanas emergentes y probá de nuevo."); return; }
+    const esc = t => String(t).replace(/[&<>"]/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[ch]));
+    let items = "";
+    for (let i = 0; i < q; i++) items += '<div class="it"><img src="' + blobUrl + '" alt="">' + (cut ? '<div class="cut"></div>' : "") + "</div>";
+    w.document.write('<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">' +
+      "<title>Etiquetas " + esc(title) + " - " + d + " mm</title><style>" +
+      "@page{size:A4;margin:10mm}body{margin:0;padding:10mm;font-family:system-ui,sans-serif}" +
+      ".info{font-size:12px;color:#555;margin:0 0 5mm}.grid{display:flex;flex-wrap:wrap;gap:3mm}" +
+      ".it{position:relative;width:" + W + "mm;height:" + W + "mm;break-inside:avoid}" +
+      ".it img{width:100%;height:100%;display:block}" +
+      ".cut{position:absolute;inset:" + b + "mm;border-radius:50%;border:.25mm dashed #888}" +
+      "@media print{body{padding:0}.info{display:none}}</style></head><body>" +
+      '<p class="info">' + esc(title) + " · corte de " + d + " mm de diámetro. Imprimí al 100 % / tamaño real (sin “ajustar a la página”).</p>" +
+      '<div class="grid">' + items + "</div>" +
+      "<script>window.onload=function(){setTimeout(function(){print()},400)}<\/script></body></html>");
+    w.document.close();
+  }
+
   // ---------- historial (guardado en este navegador) ----------
   function loadHist() {
     try { return JSON.parse(localStorage.getItem(HKEY)) || []; } catch { return []; }
@@ -440,7 +562,7 @@
     async function doCopy(full) {
       if (!cur) return;
       await copyText(full ? "https://" + short : short);
-      const img = code ? (cropper.has() ? cropper.export(320, 0.8) : savedImg) : null;
+      const img = code ? (cropper.has() ? cropper.export(600, 0.85) : savedImg) : null;
       upsert({ svc, id: cur, name: name.value.trim(), cover: cover.checked, c: code, img, ts: Date.now() });
       card.classList.remove("editing");
       msg.className = "msg ok";
@@ -505,6 +627,103 @@
     $(".copyShort").addEventListener("click", () => doCopy(false));
     $(".copyFull").addEventListener("click", () => doCopy(true));
     showCustom();
+
+    // ----- etiqueta para imprimir -----
+    const pdet = $("details.print"), pd = $(".pd"), pq = $(".pq"), phole = $(".phole"), pcut = $(".pcut");
+    const pprev = $(".pprev"), pnote = $(".pnote");
+    const accent = COLORS[svc];
+    let pcfg = loadPrintCfg();
+    let srcCache = { key: "", val: null };
+
+    function syncPrintUI() {
+      pd.value = pcfg.d; pq.value = pcfg.q; phole.checked = pcfg.hole; pcut.checked = pcfg.cut;
+      card.querySelectorAll(".pst").forEach(b => b.classList.toggle("on", b.dataset.st === pcfg.st));
+    }
+    function readPrintUI() {
+      pcfg = {
+        d: Math.min(200, Math.max(10, parseFloat(pd.value) || 30)),
+        q: Math.min(200, Math.max(1, parseInt(pq.value, 10) || 1)),
+        st: pcfg.st, hole: phole.checked, cut: pcut.checked
+      };
+      savePrintCfg(pcfg);
+    }
+
+    // imagen para la etiqueta: portada personalizada o la portada de la playlist
+    async function labelSource() {
+      if (!cur) return null;
+      if (code && (cropper.has() || savedImg)) {
+        const key = "c:" + code + ":" + (cropper.has() ? "live" : "saved");
+        if (srcCache.key !== key || cropper.has()) {
+          const url = cropper.has() ? cropper.export(1200, 0.92) : savedImg;
+          srcCache = { key, val: { img: await loadImg(url), yt: false, kind: "personalizada" } };
+        }
+        return srcCache.val;
+      }
+      const key = svc + ":" + cur;
+      if (srcCache.key === key) return srcCache.val;
+      let val = null;
+      try {
+        const u = svc === "s"
+          ? "https://open.spotify.com/oembed?url=" + encodeURIComponent(sourceUrl("s", cur))
+          : "https://www.youtube.com/oembed?format=json&url=" + encodeURIComponent("https://www.youtube.com/playlist?list=" + cur);
+        const j = await fetch(u).then(r => r.ok ? r.json() : null);
+        if (j && j.thumbnail_url) val = { img: await loadImg(j.thumbnail_url, true), yt: svc === "y", kind: "de la playlist" };
+      } catch {}
+      srcCache = { key, val };
+      return val;
+    }
+
+    let prevTimer = null;
+    function refreshPrint() {
+      if (!pdet.open) return;
+      clearTimeout(prevTimer);
+      prevTimer = setTimeout(async () => {
+        const s = await labelSource();
+        const c = renderLabel(s, pcfg.st, pcfg.hole, 400, accent);
+        const x = pprev.getContext("2d");
+        x.clearRect(0, 0, 400, 400); x.drawImage(c, 0, 0);
+        if (!s) pnote.textContent = "No pude traer la portada; se imprime con la etiqueta de color.";
+        else {
+          const [, , side] = srcRect(s);
+          const dpi = Math.round(side / (pcfg.d / 25.4) * (pcfg.st === "cover" ? 1 : 1 / 0.38));
+          pnote.textContent = "Portada " + s.kind + (dpi < 200 ? " · ⚠ baja resolución para " + pcfg.d + " mm (" + dpi + " dpi), puede verse borrosa" : "");
+        }
+      }, 120);
+    }
+
+    async function buildPrintBlob() {
+      readPrintUI();
+      const s = await labelSource();
+      const mm = pcfg.d + (pcfg.cut ? 2 * BLEED : 0);
+      const N = Math.min(4000, Math.round(mm / 25.4 * DPI));
+      const c = renderLabel(s, pcfg.st, pcfg.hole, N, accent);
+      return new Promise(res => c.toBlob(res, "image/png"));
+    }
+
+    syncPrintUI();
+    pdet.addEventListener("toggle", refreshPrint);
+    [pd, pq].forEach(i => i.addEventListener("input", () => { readPrintUI(); refreshPrint(); }));
+    [phole, pcut].forEach(i => i.addEventListener("change", () => { readPrintUI(); refreshPrint(); }));
+    card.querySelectorAll(".pst").forEach(b => b.addEventListener("click", () => {
+      pcfg.st = b.dataset.st; savePrintCfg(pcfg); syncPrintUI(); refreshPrint();
+    }));
+    $(".pprint").addEventListener("click", async () => {
+      const blob = await buildPrintBlob();
+      const title = name.value.trim() || "Playlist";
+      openPrintSheet(URL.createObjectURL(blob), pcfg.d, pcfg.q, pcfg.cut, title);
+    });
+    $(".ppng").addEventListener("click", async () => {
+      const blob = await buildPrintBlob();
+      const url = URL.createObjectURL(blob);
+      downloadDataUrl(url, "etiqueta-" + (code || cur) + "-" + pcfg.d + "mm.png");
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+    });
+    // refrescar la vista previa cuando cambia la playlist o la portada
+    [link, name].forEach(i => i.addEventListener("input", refreshPrint));
+    $(".zoom").addEventListener("input", refreshPrint);
+    $(".disc canvas").addEventListener("pointerup", refreshPrint);
+    cfile.addEventListener("change", () => setTimeout(refreshPrint, 300));
+    rmc.addEventListener("click", refreshPrint);
   });
 
   renderHist();
