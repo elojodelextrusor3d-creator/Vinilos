@@ -24,13 +24,14 @@
   .card h2 { margin:0; font-size:1.2rem; display:flex; align-items:center; gap:10px; }
   .dot { width:14px; height:14px; border-radius:50%; background:var(--c); display:inline-block; flex:none; }
   label { font-size:.85rem; color:var(--muted); }
-  input[type=text], input:not([type]) {
+  input.link, input.name {
     width:100%; padding:13px 14px; border-radius:12px; border:1px solid var(--line);
     background:#101013; color:var(--fg); font-size:1rem;
   }
   input:focus { outline:2px solid var(--c); border-color:transparent; }
   .chk { display:flex; align-items:center; gap:10px; color:var(--fg); font-size:.95rem; padding:4px 0; }
   .chk input { width:22px; height:22px; accent-color:var(--c); margin:0; }
+  .chk.off { opacity:.4; }
   .row { display:flex; gap:8px; flex-wrap:wrap; }
   button, .btn {
     flex:1 1 auto; padding:12px 14px; border:0; border-radius:12px; font-size:.95rem; font-weight:600;
@@ -38,6 +39,7 @@
     font-family:inherit;
   }
   button.main { background:var(--c); color:#fff; }
+  .hidden { display:none !important; }
   .out {
     display:none; flex-direction:column; gap:8px; padding:12px; border-radius:12px; background:#101013;
     border:1px dashed var(--line);
@@ -51,14 +53,35 @@
   .help { max-width:520px; color:var(--muted); font-size:.85rem; line-height:1.45; }
   .help b { color:var(--fg); }
 
+  /* Portada personalizada */
+  .custom { display:flex; flex-direction:column; gap:8px; padding:12px; border-radius:12px; background:#101013; }
+  .crop { display:flex; flex-direction:column; align-items:center; gap:10px; }
+  .disc {
+    position:relative; width:250px; height:250px; border-radius:50%;
+    background:#1b1b1f; box-shadow:0 0 0 2px #2a2a30; display:grid; place-items:center;
+  }
+  .disc canvas {
+    width:62%; height:62%; border-radius:50%; touch-action:none; cursor:grab; background:#000;
+    box-shadow:0 0 0 4px var(--c);
+  }
+  .disc::after { /* agujero del centro */
+    content:""; position:absolute; left:50%; top:50%; width:16px; height:16px; margin:-8px 0 0 -8px;
+    border-radius:50%; background:var(--bg); box-shadow:0 0 0 2px rgba(255,255,255,.85); pointer-events:none;
+  }
+  .zoom { width:100%; accent-color:var(--c); }
+  .small { font-size:.8rem; color:var(--muted); text-align:center; }
+  .cinfo { font-size:.85rem; color:var(--fg); }
+  .cinfo code { color:#ffd27a; }
+
   /* Mis llaveros */
   .hint { margin:0; color:var(--muted); font-size:.85rem; }
   .item { display:flex; flex-direction:column; gap:8px; padding:12px; border-radius:12px; background:#101013; }
   .item .top { display:flex; align-items:center; gap:10px; min-width:0; }
+  .item .thumb { width:34px; height:34px; border-radius:50%; object-fit:cover; flex:none; box-shadow:0 0 0 2px var(--c); }
   .item .txt { min-width:0; }
   .item .t { font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .item .s { font-size:.8rem; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .item button { padding:9px 10px; font-size:.85rem; }
+  .item button, .item .btn { padding:9px 10px; font-size:.85rem; }
   .item .del { flex:0 0 auto; background:transparent; color:#ff8080; }
   .empty { color:var(--muted); font-size:.9rem; text-align:center; padding:8px; }
 </style>
@@ -67,14 +90,30 @@
   <h1>Generador de links</h1>
   <p class="intro">Pegá el link de la playlist, copiá el resultado y grabalo en el llavero con NFC Tools.</p>
 
-  <section class="card" style="--c:#1db954" data-svc="s" id="card-s">
-    <h2><span class="dot"></span>Spotify</h2>
+  <template id="cardBody">
     <label>Link de la playlist</label>
-    <input class="link" placeholder="https://open.spotify.com/playlist/…" inputmode="url" autocomplete="off">
+    <input class="link" inputmode="url" autocomplete="off">
     <label>Nombre en la página (opcional, si no se usa el de la playlist)</label>
     <input class="name" placeholder="ej: Para Juli" maxlength="40" autocomplete="off">
-    <label class="chk"><input type="checkbox" class="cover"> Mostrar portada en el vinilo</label>
-    <div class="row"><button class="paste">📋 Pegar</button><button class="clear">Borrar</button></div>
+    <label class="chk"><input type="checkbox" class="cover"> Mostrar portada de la playlist en el vinilo</label>
+
+    <div class="custom">
+      <label>Portada personalizada (opcional)</label>
+      <div class="row">
+        <button class="pick">🖼 Elegir foto</button>
+        <button class="rmc hidden">Quitar</button>
+      </div>
+      <input type="file" accept="image/*" class="cfile hidden">
+      <div class="crop hidden">
+        <div class="disc"><canvas width="320" height="320"></canvas></div>
+        <input type="range" class="zoom" min="1" max="4" step="0.01" value="1" aria-label="Zoom">
+        <div class="small">Arrastrá la foto para acomodarla · deslizá para hacer zoom</div>
+        <button class="main dl" style="width:100%">⬇ Descargar portada</button>
+      </div>
+      <div class="cinfo hidden"></div>
+    </div>
+
+    <div class="row"><button class="paste">📋 Pegar link</button><button class="clear">Borrar todo</button></div>
     <div class="msg"></div>
     <div class="out">
       <label>Para NFC Tools (URL / URI con prefijo https://)</label>
@@ -85,26 +124,14 @@
         <a class="btn test" target="_blank" rel="noopener">Probar</a>
       </div>
     </div>
+  </template>
+
+  <section class="card" style="--c:#1db954" data-svc="s">
+    <h2><span class="dot"></span>Spotify</h2>
   </section>
 
-  <section class="card" style="--c:#ff0033" data-svc="y" id="card-y">
+  <section class="card" style="--c:#ff0033" data-svc="y">
     <h2><span class="dot"></span>YouTube Music</h2>
-    <label>Link de la playlist</label>
-    <input class="link" placeholder="https://music.youtube.com/playlist?list=…" inputmode="url" autocomplete="off">
-    <label>Nombre en la página (opcional, si no se usa el de la playlist)</label>
-    <input class="name" placeholder="ej: Para Juli" maxlength="40" autocomplete="off">
-    <label class="chk"><input type="checkbox" class="cover"> Mostrar portada en el vinilo</label>
-    <div class="row"><button class="paste">📋 Pegar</button><button class="clear">Borrar</button></div>
-    <div class="msg"></div>
-    <div class="out">
-      <label>Para NFC Tools (URL / URI con prefijo https://)</label>
-      <code class="short"></code>
-      <div class="row">
-        <button class="main copyShort">Copiar para NFC Tools</button>
-        <button class="copyFull">Copiar link completo</button>
-        <a class="btn test" target="_blank" rel="noopener">Probar</a>
-      </div>
-    </div>
   </section>
 
   <section class="card" style="--c:#8a8a96">
@@ -115,7 +142,9 @@
 
   <div class="help">
     <b>En NFC Tools:</b> Escribir → Agregar un registro → URL / URI → elegí el prefijo <b>https://</b> →
-    pegá lo copiado → Escribir → acercá el llavero.<br>
+    pegá lo copiado → Escribir → acercá el llavero.<br><br>
+    <b>Portada personalizada:</b> descargá la portada y subila a GitHub (repositorio Vinilos → Add file →
+    Upload files), junto al index.html, <b>sin cambiarle el nombre</b>. Hasta que la subas, el vinilo se ve sin ella.<br><br>
     Solo funciona con <b>playlists</b> (no álbumes ni canciones sueltas).
   </div>
 
@@ -124,6 +153,7 @@
   const ID = /^[A-Za-z0-9_-]{2,80}$/;
   const HKEY = "vinilos.historial";
   const COLORS = { s: "#1db954", y: "#ff0033" };
+  const MAX_LEN = 125; // aprox. lo que entra en un NTAG213
 
   // ---------- links ----------
   function parse(svc, text) {
@@ -154,10 +184,11 @@
     return { album: "álbum", track: "tema", artist: "artista", show: "podcast", episode: "episodio" }[t.toLowerCase()] || t;
   }
 
-  function buildShort(svc, id, name, cover) {
+  function buildShort(svc, id, name, cover, c) {
     let s = BASE + "?" + svc + "=" + id;
     if (name) s += "&n=" + encodeURIComponent(name).replace(/%20/g, "+");
-    if (cover) s += "&p=1";
+    if (c) s += "&c=" + c;
+    else if (cover) s += "&p=1";
     return s;
   }
 
@@ -181,19 +212,98 @@
     ta.remove();
   }
 
+  function newCode() {
+    const ch = "abcdefghijkmnpqrstuvwxyz23456789";
+    let s = "";
+    const r = crypto.getRandomValues(new Uint8Array(6));
+    for (const b of r) s += ch[b % ch.length];
+    return s;
+  }
+
+  function downloadDataUrl(dataUrl, filename) {
+    const a = document.createElement("a");
+    a.href = dataUrl; a.download = filename;
+    document.body.append(a); a.click(); a.remove();
+  }
+
+  // ---------- recorte circular ----------
+  function makeCropper(canvas, zoom) {
+    const ctx = canvas.getContext("2d");
+    const S = canvas.width;
+    let img = null, base = 1, scale = 1, ox = 0, oy = 0, drag = null;
+
+    function clamp() {
+      const w = img.width * scale, h = img.height * scale;
+      const mx = Math.max(0, (w - S) / 2), my = Math.max(0, (h - S) / 2);
+      ox = Math.max(-mx, Math.min(mx, ox));
+      oy = Math.max(-my, Math.min(my, oy));
+    }
+    function paint(c, size) {
+      const k = size / S, w = img.width * scale, h = img.height * scale;
+      c.fillStyle = "#000"; c.fillRect(0, 0, size, size);
+      c.drawImage(img, (S / 2 - w / 2 + ox) * k, (S / 2 - h / 2 + oy) * k, w * k, h * k);
+    }
+    function draw() { if (img) paint(ctx, S); }
+
+    canvas.addEventListener("pointerdown", e => {
+      if (!img) return;
+      drag = { x: e.clientX, y: e.clientY };
+      canvas.setPointerCapture(e.pointerId);
+      canvas.style.cursor = "grabbing";
+    });
+    canvas.addEventListener("pointermove", e => {
+      if (!drag) return;
+      const f = S / canvas.clientWidth;
+      ox += (e.clientX - drag.x) * f; oy += (e.clientY - drag.y) * f;
+      drag = { x: e.clientX, y: e.clientY };
+      clamp(); draw();
+    });
+    const end = () => { drag = null; canvas.style.cursor = "grab"; };
+    canvas.addEventListener("pointerup", end);
+    canvas.addEventListener("pointercancel", end);
+    zoom.addEventListener("input", () => { if (!img) return; scale = base * zoom.value; clamp(); draw(); });
+
+    return {
+      load(src) {
+        return new Promise((res, rej) => {
+          const i = new Image();
+          i.onload = () => {
+            img = i; base = S / Math.min(i.width, i.height); scale = base;
+            zoom.value = 1; ox = oy = 0; draw(); res();
+          };
+          i.onerror = rej;
+          i.src = src;
+        });
+      },
+      has() { return !!img; },
+      reset() { img = null; ctx.clearRect(0, 0, S, S); },
+      export(size, q) {
+        const c = document.createElement("canvas");
+        c.width = c.height = size;
+        paint(c.getContext("2d"), size);
+        return c.toDataURL("image/jpeg", q);
+      }
+    };
+  }
+
   // ---------- historial (guardado en este navegador) ----------
   function loadHist() {
     try { return JSON.parse(localStorage.getItem(HKEY)) || []; } catch { return []; }
   }
   function saveHist(list) {
-    try { localStorage.setItem(HKEY, JSON.stringify(list)); } catch {}
+    try { localStorage.setItem(HKEY, JSON.stringify(list)); return true; }
+    catch { return false; }
   }
   function upsert(entry) {
-    const list = loadHist().filter(e => !(e.svc === entry.svc && e.id === entry.id));
-    const old = loadHist().find(e => e.svc === entry.svc && e.id === entry.id);
+    const all = loadHist();
+    const old = all.find(e => e.svc === entry.svc && e.id === entry.id);
     if (old && !entry.title) entry.title = old.title;
+    if (old && entry.c && entry.c === old.c && !entry.img) entry.img = old.img;
+    const list = all.filter(e => e !== old);
     list.unshift(entry);
-    saveHist(list);
+    if (!saveHist(list)) { // sin lugar: guarda sin la imagen
+      entry.img = null; saveHist(list);
+    }
     renderHist();
     if (!entry.title) {
       fetchTitle(entry.svc, entry.id).then(t => {
@@ -224,32 +334,34 @@
       item.style.setProperty("--c", COLORS[e.svc]);
 
       const top = document.createElement("div"); top.className = "top";
-      const dot = document.createElement("span"); dot.className = "dot";
+      let mark;
+      if (e.img) { mark = document.createElement("img"); mark.className = "thumb"; mark.src = e.img; mark.alt = ""; }
+      else { mark = document.createElement("span"); mark.className = "dot"; }
       const txt = document.createElement("div"); txt.className = "txt";
       const t = document.createElement("div"); t.className = "t";
       t.textContent = e.name || e.title || e.id;
       const s = document.createElement("div"); s.className = "s";
       const parts = [e.svc === "s" ? "Spotify" : "YouTube Music"];
       if (e.name && e.title) parts.push(e.title);
-      if (e.cover) parts.push("con portada");
+      if (e.c) parts.push("portada " + e.c + ".jpg");
+      else if (e.cover) parts.push("con portada");
       parts.push(new Date(e.ts).toLocaleDateString());
       s.textContent = parts.join(" · ");
       txt.append(t, s);
-      top.append(dot, txt);
+      top.append(mark, txt);
 
       const row = document.createElement("div"); row.className = "row";
       const bEdit = document.createElement("button"); bEdit.textContent = "✏️ Editar";
       const bCopy = document.createElement("button"); bCopy.textContent = "Copiar";
       const bTest = document.createElement("a"); bTest.className = "btn"; bTest.textContent = "Probar";
-      bTest.style.padding = "9px 10px"; bTest.style.fontSize = ".85rem";
-      bTest.href = "https://" + buildShort(e.svc, e.id, e.name, e.cover);
+      bTest.href = "https://" + buildShort(e.svc, e.id, e.name, e.cover, e.c);
       bTest.target = "_blank"; bTest.rel = "noopener";
       const bDel = document.createElement("button"); bDel.className = "del"; bDel.textContent = "🗑";
       bDel.title = "Borrar de la lista";
 
       bEdit.onclick = () => cards[e.svc].load(e);
       bCopy.onclick = async () => {
-        await copyText(buildShort(e.svc, e.id, e.name, e.cover));
+        await copyText(buildShort(e.svc, e.id, e.name, e.cover, e.c));
         bCopy.textContent = "✔ Copiado";
         setTimeout(() => { bCopy.textContent = "Copiar"; }, 1500);
       };
@@ -258,18 +370,48 @@
         saveHist(loadHist().filter(x => !(x.svc === e.svc && x.id === e.id)));
         renderHist();
       };
-      row.append(bEdit, bCopy, bTest, bDel);
+      row.append(bEdit, bCopy, bTest);
+      if (e.img && e.c) {
+        const bImg = document.createElement("button"); bImg.textContent = "⬇ Portada";
+        bImg.onclick = () => downloadDataUrl(e.img, e.c + ".jpg");
+        row.append(bImg);
+      }
+      row.append(bDel);
       item.append(top, row);
       box.append(item);
     }
   }
 
   // ---------- tarjetas ----------
+  const tpl = document.getElementById("cardBody");
   document.querySelectorAll(".card[data-svc]").forEach(card => {
+    card.append(tpl.content.cloneNode(true));
     const svc = card.dataset.svc;
     const $ = s => card.querySelector(s);
     const link = $(".link"), name = $(".name"), cover = $(".cover"), msg = $(".msg"), out = $(".out");
-    let cur = null, short = "";
+    link.placeholder = svc === "s" ? "https://open.spotify.com/playlist/…" : "https://music.youtube.com/playlist?list=…";
+    const cfile = $(".cfile"), crop = $(".crop"), cinfo = $(".cinfo"), rmc = $(".rmc"), pick = $(".pick");
+    const cropper = makeCropper($(".disc canvas"), $(".zoom"));
+    let cur = null, short = "", code = null, savedImg = null;
+
+    function showCustom() {
+      crop.classList.toggle("hidden", !cropper.has());
+      rmc.classList.toggle("hidden", !code);
+      cover.closest(".chk").classList.toggle("off", !!code);
+      cover.disabled = !!code;
+      pick.textContent = code ? "🖼 Cambiar foto" : "🖼 Elegir foto";
+      if (code) {
+        cinfo.classList.remove("hidden");
+        cinfo.innerHTML = "";
+        cinfo.append("Archivo: ");
+        const c = document.createElement("code"); c.textContent = code + ".jpg";
+        cinfo.append(c, cropper.has()
+          ? " — descargalo y subilo a GitHub sin cambiarle el nombre."
+          : " — ya creado. Si todavía no lo subiste a GitHub, subilo.");
+      } else {
+        cinfo.classList.add("hidden");
+      }
+    }
 
     function update() {
       const r = parse(svc, link.value);
@@ -282,11 +424,14 @@
         return;
       }
       cur = r.id;
-      short = buildShort(svc, cur, name.value.trim(), cover.checked);
+      short = buildShort(svc, cur, name.value.trim(), cover.checked, code);
       $(".short").textContent = short;
       $(".test").href = "https://" + short;
       out.classList.add("show");
-      if (!card.classList.contains("editing")) {
+      if (short.length > MAX_LEN) {
+        msg.className = "msg warn";
+        msg.textContent = "⚠ El link es largo y puede no entrar en un chip NTAG213. Acortá el nombre.";
+      } else if (!card.classList.contains("editing")) {
         msg.className = "msg ok";
         msg.textContent = "✔ Playlist encontrada";
       }
@@ -295,23 +440,53 @@
     async function doCopy(full) {
       if (!cur) return;
       await copyText(full ? "https://" + short : short);
-      upsert({ svc, id: cur, name: name.value.trim(), cover: cover.checked, ts: Date.now() });
+      const img = code ? (cropper.has() ? cropper.export(320, 0.8) : savedImg) : null;
+      upsert({ svc, id: cur, name: name.value.trim(), cover: cover.checked, c: code, img, ts: Date.now() });
       card.classList.remove("editing");
       msg.className = "msg ok";
-      msg.textContent = "✔ Copiado y guardado en «Mis llaveros». Ahora pegalo en NFC Tools.";
+      msg.textContent = code && cropper.has()
+        ? "✔ Copiado y guardado. Acordate de descargar la portada y subirla a GitHub."
+        : "✔ Copiado y guardado en «Mis llaveros». Ahora pegalo en NFC Tools.";
     }
+
+    pick.addEventListener("click", () => cfile.click());
+    cfile.addEventListener("change", async () => {
+      const f = cfile.files && cfile.files[0];
+      cfile.value = "";
+      if (!f) return;
+      const url = URL.createObjectURL(f);
+      try {
+        await cropper.load(url);
+        code = newCode();
+        savedImg = null;
+        showCustom(); update();
+      } catch {
+        msg.className = "msg err"; msg.textContent = "No pude abrir esa imagen.";
+      } finally {
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }
+    });
+    rmc.addEventListener("click", () => { code = null; savedImg = null; cropper.reset(); showCustom(); update(); });
+    $(".dl").addEventListener("click", () => {
+      if (!cropper.has() || !code) return;
+      downloadDataUrl(cropper.export(600, 0.88), code + ".jpg");
+    });
 
     cards[svc] = {
       load(e) {
         link.value = sourceUrl(e.svc, e.id);
         name.value = e.name || "";
         cover.checked = !!e.cover;
+        code = e.c || null;
+        savedImg = e.img || null;
+        cropper.reset();
+        if (e.img) cropper.load(e.img).then(showCustom);
+        showCustom();
         card.classList.add("editing");
         update();
         msg.className = "msg warn";
         msg.textContent = "✏️ Editando. Cambiá lo que quieras, tocá «Copiar para NFC Tools» y volvé a grabar el llavero.";
         card.scrollIntoView({ behavior: "smooth", block: "start" });
-        name.focus({ preventScroll: true });
       }
     };
 
@@ -323,10 +498,13 @@
       catch { link.focus(); msg.className = "msg"; msg.textContent = "Mantené apretado el cuadro y elegí Pegar."; }
     });
     $(".clear").addEventListener("click", () => {
-      link.value = ""; name.value = ""; cover.checked = false; card.classList.remove("editing"); update(); link.focus();
+      link.value = ""; name.value = ""; cover.checked = false;
+      code = null; savedImg = null; cropper.reset(); showCustom();
+      card.classList.remove("editing"); update(); link.focus();
     });
     $(".copyShort").addEventListener("click", () => doCopy(false));
     $(".copyFull").addEventListener("click", () => doCopy(true));
+    showCustom();
   });
 
   renderHist();
