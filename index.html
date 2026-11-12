@@ -167,13 +167,13 @@
       label.classList.add("cover");
     }
 
-    // &c=codigo → portada personalizada subida al repositorio como codigo.jpg
+    // &c=codigo → portada personalizada subida al repositorio en covers/codigo.jpg
     const custom = (q.get("c") || "").toLowerCase();
     const hasCustom = /^[a-z0-9]{3,12}$/.test(custom);
     if (hasCustom) {
       const img = new Image();
       img.onload = () => applyCover(img.src, "cover");
-      img.src = custom + ".jpg";
+      img.src = "covers/" + custom + ".jpg";
     }
 
     const wantCover = q.get("p") === "1" && !hasCustom;

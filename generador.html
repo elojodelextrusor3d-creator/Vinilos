@@ -197,8 +197,9 @@
   <div class="help">
     <b>En NFC Tools:</b> Escribir → Agregar un registro → URL / URI → elegí el prefijo <b>https://</b> →
     pegá lo copiado → Escribir → acercá el llavero.<br><br>
-    <b>Portada personalizada:</b> descargá la portada y subila a GitHub (repositorio Vinilos → Add file →
-    Upload files), junto al index.html, <b>sin cambiarle el nombre</b>. Hasta que la subas, el vinilo se ve sin ella.<br><br>
+    <b>Portada personalizada:</b> descargá la portada y subila a GitHub dentro de la carpeta <b>covers</b>
+    (repositorio Vinilos → entrá a la carpeta covers → Add file → Upload files), <b>sin cambiarle el nombre</b>.
+    Hasta que la subas, el vinilo se ve sin ella.<br><br>
     Solo funciona con <b>playlists</b> (no álbumes ni canciones sueltas).
   </div>
   </div><!-- /tab-link -->
@@ -674,8 +675,8 @@
         cinfo.append("Archivo: ");
         const c = document.createElement("code"); c.textContent = code + ".jpg";
         cinfo.append(c, cropper.has()
-          ? " — descargalo y subilo a GitHub sin cambiarle el nombre."
-          : " — ya creado. Si todavía no lo subiste a GitHub, subilo.");
+          ? " — descargalo y subilo a la carpeta covers de GitHub, sin cambiarle el nombre."
+          : " — ya creado. Si todavía no lo subiste a la carpeta covers de GitHub, subilo.");
       } else {
         cinfo.classList.add("hidden");
       }
@@ -713,7 +714,7 @@
       card.classList.remove("editing");
       msg.className = "msg ok";
       msg.textContent = code && cropper.has()
-        ? "✔ Copiado y guardado. Acordate de descargar la portada y subirla a GitHub."
+        ? "✔ Copiado y guardado. Acordate de descargar la portada y subirla a la carpeta covers de GitHub."
         : "✔ Copiado y guardado en «Mis llaveros». Ahora pegalo en NFC Tools.";
     }
 
