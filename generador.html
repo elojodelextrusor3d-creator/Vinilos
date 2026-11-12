@@ -73,22 +73,40 @@
   .cinfo { font-size:.85rem; color:var(--fg); }
   .cinfo code { color:#ffd27a; }
 
-  /* Etiqueta para imprimir */
-  details.print { border-top:1px solid var(--line); padding-top:10px; }
-  details.print summary { cursor:pointer; font-weight:700; padding:6px 0; list-style:none; }
-  details.print summary::-webkit-details-marker { display:none; }
-  details.print summary::after { content:" ▸"; color:var(--muted); }
-  details.print[open] summary::after { content:" ▾"; }
-  .pbody { display:flex; flex-direction:column; gap:10px; margin-top:8px; }
+  /* Pestañas */
+  .tabs {
+    position:sticky; top:0; z-index:5; width:100%; max-width:520px; display:flex; gap:6px; padding:6px;
+    background:#0b0b0d; border-radius:14px; box-shadow:0 6px 18px rgba(0,0,0,.4);
+  }
+  .tabs button { background:transparent; color:var(--muted); }
+  .tabs button.on { background:#2a2a31; color:var(--fg); }
+  .tab { width:100%; display:flex; flex-direction:column; align-items:center; gap:18px; }
+  .tab.off { display:none; }
+
+  /* Editor */
+  .sel {
+    width:100%; padding:12px; border-radius:12px; border:1px solid var(--line);
+    background:#101013; color:var(--fg); font-size:.95rem;
+  }
+  .edstage { display:grid; place-items:center; padding:6px 0; }
+  #edCanvas { width:min(100%,320px); aspect-ratio:1; touch-action:none; cursor:grab; }
+  .swatches { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .sw {
+    flex:none; width:34px; height:34px; padding:0; border-radius:50%; border:2px solid #3a3a42;
+  }
+  .sw.on { outline:3px solid #fff; outline-offset:2px; }
+  .sw.pick { position:relative; overflow:hidden; background:conic-gradient(red,yellow,lime,cyan,blue,magenta,red); }
+  .sw.pick input { position:absolute; inset:0; opacity:0; width:100%; height:100%; cursor:pointer; }
+  #edPrint { background:#f60; color:#fff; }
   .pgrid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
   .pgrid label { display:flex; flex-direction:column; gap:4px; }
-  .pgrid input {
+  .pgrid input[type=number] {
     width:100%; padding:10px 12px; border-radius:10px; border:1px solid var(--line);
-    background:#1b1b1f; color:var(--fg); font-size:1rem;
+    background:#101013; color:var(--fg); font-size:1rem;
   }
-  .seg button { background:#1b1b1f; border:1px solid var(--line); }
-  .seg button.on { background:var(--c); border-color:transparent; color:#fff; }
-  .pprev { width:170px; height:170px; align-self:center; }
+  .card.ok-edit { outline:none; }
+  .seg button { background:#101013; border:1px solid var(--line); }
+  .seg button.on { background:#f60; border-color:transparent; color:#fff; }
 
   /* Mis llaveros */
   .hint { margin:0; color:var(--muted); font-size:.85rem; }
@@ -104,6 +122,12 @@
 </style>
 </head>
 <body>
+  <nav class="tabs">
+    <button data-tab="link">🔗 Generar link</button>
+    <button data-tab="editor">🎨 Editor de etiqueta</button>
+  </nav>
+
+  <div id="tab-link" class="tab">
   <h1>Generador de links</h1>
   <p class="intro">Pegá el link de la playlist, copiá el resultado y grabalo en el llavero con NFC Tools.</p>
 
@@ -141,29 +165,7 @@
         <a class="btn test" target="_blank" rel="noopener">Probar</a>
       </div>
 
-      <details class="print">
-        <summary>🖨 Etiqueta para imprimir</summary>
-        <div class="pbody">
-          <div class="pgrid">
-            <label>Diámetro (mm)<input type="number" class="pd" min="10" max="200" step="0.5" value="30"></label>
-            <label>Cantidad<input type="number" class="pq" min="1" max="200" step="1" value="1"></label>
-          </div>
-          <label>Estilo</label>
-          <div class="row seg">
-            <button class="pst" data-st="cover">Solo portada</button>
-            <button class="pst" data-st="vinyl">Vinilo completo</button>
-          </div>
-          <label class="chk"><input type="checkbox" class="phole"> Agujero en el centro</label>
-          <label class="chk"><input type="checkbox" class="pcut"> Línea de corte (con 1 mm de sangrado)</label>
-          <canvas class="pprev" width="400" height="400"></canvas>
-          <div class="small pnote"></div>
-          <div class="row">
-            <button class="main pprint">🖨 Imprimir</button>
-            <button class="ppng">⬇ Descargar PNG</button>
-          </div>
-          <div class="small">Al imprimir elegí tamaño <b>100 % / real</b>, sin “ajustar a la página”.</div>
-        </div>
-      </details>
+      <button class="toEditor">🎨 Hacer etiqueta para imprimir</button>
     </div>
   </template>
 
@@ -188,6 +190,72 @@
     Upload files), junto al index.html, <b>sin cambiarle el nombre</b>. Hasta que la subas, el vinilo se ve sin ella.<br><br>
     Solo funciona con <b>playlists</b> (no álbumes ni canciones sueltas).
   </div>
+  </div><!-- /tab-link -->
+
+  <div id="tab-editor" class="tab">
+    <h1>Editor de etiqueta</h1>
+    <p class="intro">Armá la etiqueta circular para pegar atrás del llavero y exportala para imprimir.</p>
+
+    <section class="card" id="ed" style="--c:#1db954">
+      <h2>1 · Imagen</h2>
+      <div class="row">
+        <button id="edPick">🖼 Elegir foto</button>
+        <button id="edLinkBtn">🎵 Portada de una playlist</button>
+      </div>
+      <div id="edLinkBox" class="hidden" style="display:flex;flex-direction:column;gap:8px">
+        <input class="link" id="edLink" inputmode="url" autocomplete="off" placeholder="Pegá el link de Spotify o YouTube Music">
+        <div class="row"><button id="edLinkPaste">📋 Pegar</button><button class="main" id="edLinkGo">Traer portada</button></div>
+      </div>
+      <select id="edHist" class="sel"><option value="">… o elegí uno de «Mis llaveros»</option></select>
+      <input type="file" accept="image/*" id="edFile" class="hidden">
+      <div class="msg" id="edMsg"></div>
+
+      <div class="edstage">
+        <canvas id="edCanvas" width="640" height="640"></canvas>
+      </div>
+      <label>Zoom</label>
+      <input type="range" id="edZoom" class="zoom" min="1" max="4" step="0.01" value="1">
+      <div class="small">Arrastrá la imagen sobre el círculo para acomodarla.</div>
+    </section>
+
+    <section class="card" style="--c:#8a8a96">
+      <h2>2 · Estilo</h2>
+      <div class="row seg" id="edStyle">
+        <button data-st="cover">Solo portada</button>
+        <button data-st="vinyl">Vinilo completo</button>
+      </div>
+      <div id="edVinylOpts" style="display:flex;flex-direction:column;gap:10px">
+        <label>Tamaño de la etiqueta del centro</label>
+        <input type="range" id="edLabel" class="zoom" min="25" max="65" step="1" value="40">
+        <label>Color del aro</label>
+        <div class="swatches" id="edRing"></div>
+        <label>Color del disco</label>
+        <div class="swatches" id="edDisc"></div>
+      </div>
+      <label class="chk"><input type="checkbox" id="edHole"> Agujero en el centro</label>
+      <label>Texto curvo abajo (opcional)</label>
+      <input class="link" id="edText" maxlength="40" placeholder="ej: Para Juli ❤" autocomplete="off">
+      <label>Tamaño del texto</label>
+      <input type="range" id="edTSize" class="zoom" min="50" max="160" value="100">
+      <label>Color del texto</label>
+      <div class="swatches" id="edTColor"></div>
+    </section>
+
+    <section class="card" style="--c:#8a8a96">
+      <h2>3 · Exportar para imprimir</h2>
+      <div class="pgrid">
+        <label>Diámetro (mm)<input type="number" id="edD" min="10" max="200" step="0.5" value="30"></label>
+        <label>Cantidad<input type="number" id="edQ" min="1" max="200" step="1" value="1"></label>
+      </div>
+      <label class="chk"><input type="checkbox" id="edCut" checked> Línea de corte (con 1 mm de sangrado)</label>
+      <div class="small" id="edNote"></div>
+      <div class="row">
+        <button class="main" id="edPrint" style="--c:#f60">🖨 Imprimir</button>
+        <button id="edPng">⬇ Descargar PNG</button>
+      </div>
+      <div class="small">Al imprimir elegí tamaño <b>100 % / real</b>, sin “ajustar a la página”. Imprimí una de prueba y medila.</div>
+    </section>
+  </div><!-- /tab-editor -->
 
 <script>
   const BASE = "elojodelextrusor3d-creator.github.io/Vinilos/";
@@ -328,13 +396,7 @@
   }
 
   // ---------- etiqueta para imprimir ----------
-  const PKEY = "vinilos.impresion";
   const DPI = 600, BLEED = 1;
-  function loadPrintCfg() {
-    const def = { d: 30, q: 1, st: "cover", hole: false, cut: true };
-    try { return Object.assign(def, JSON.parse(localStorage.getItem(PKEY)) || {}); } catch { return def; }
-  }
-  function savePrintCfg(cfg) { try { localStorage.setItem(PKEY, JSON.stringify(cfg)); } catch {} }
 
   function loadImg(src, cors) {
     return new Promise((res, rej) => {
@@ -351,40 +413,74 @@
     return [(w - side) / 2, (h - side) / 2, side, side];
   }
 
-  function renderLabel(s, st, hole, N, accent) {
-    const c = document.createElement("canvas");
-    c.width = c.height = N;
-    const x = c.getContext("2d"), R = N / 2, TAU = Math.PI * 2;
+  // Dibuja la etiqueta completa en un contexto de N×N px según el estado del editor.
+  // La imagen se ubica con coordenadas relativas al círculo de la imagen (zoom, ox, oy),
+  // así la vista previa y la exportación en alta resolución quedan idénticas.
+  function drawLabel(x, N, st, src) {
+    const R = N / 2, TAU = Math.PI * 2;
+    const imgR = st.style === "cover" ? R : R * st.label / 100;
     const drawImg = r => {
-      if (s && s.img) {
-        const [sx, sy, sw, sh] = srcRect(s);
-        x.drawImage(s.img, sx, sy, sw, sh, R - r, R - r, 2 * r, 2 * r);
-      } else { x.fillStyle = accent; x.fillRect(R - r, R - r, 2 * r, 2 * r); }
+      if (src) {
+        const [sx, sy, sw, sh] = src.rect;
+        const D = 2 * r, s = D / Math.min(sw, sh) * st.zoom;
+        const w = sw * s, h = sh * s;
+        x.drawImage(src.img, sx, sy, sw, sh, R - w / 2 + st.ox * D, R - h / 2 + st.oy * D, w, h);
+      } else {
+        x.fillStyle = st.ring; x.fillRect(R - r, R - r, 2 * r, 2 * r);
+      }
     };
+    x.clearRect(0, 0, N, N);
     x.save();
     x.beginPath(); x.arc(R, R, R, 0, TAU); x.clip();
-    if (st === "cover") {
+    if (st.style === "cover") {
+      x.fillStyle = "#000"; x.fillRect(0, 0, N, N);
       drawImg(R);
     } else {
-      x.fillStyle = "#141417"; x.fillRect(0, 0, N, N);
+      x.fillStyle = st.disc; x.fillRect(0, 0, N, N);
       x.strokeStyle = "rgba(255,255,255,.08)"; x.lineWidth = Math.max(1, N / 450);
-      for (let r = R * 0.42; r < R * 0.97; r += R / 32) { x.beginPath(); x.arc(R, R, r, 0, TAU); x.stroke(); }
+      for (let r = imgR + R * 0.04; r < R * 0.97; r += R / 32) { x.beginPath(); x.arc(R, R, r, 0, TAU); x.stroke(); }
       if (x.createConicGradient) {
         const g = x.createConicGradient(0, R, R), z = "rgba(255,255,255,0)", l = "rgba(255,255,255,.13)";
         [[0, z], [.08, l], [.16, z], [.5, z], [.58, l], [.66, z], [1, z]].forEach(([p, col]) => g.addColorStop(p, col));
         x.fillStyle = g; x.fillRect(0, 0, N, N);
       }
-      const lr = R * 0.38;
-      x.save(); x.beginPath(); x.arc(R, R, lr, 0, TAU); x.clip(); drawImg(lr); x.restore();
-      x.beginPath(); x.arc(R, R, lr, 0, TAU); x.lineWidth = R * 0.03; x.strokeStyle = accent; x.stroke();
+      x.save(); x.beginPath(); x.arc(R, R, imgR, 0, TAU); x.clip(); drawImg(imgR); x.restore();
+      x.beginPath(); x.arc(R, R, imgR, 0, TAU); x.lineWidth = R * 0.03; x.strokeStyle = st.ring; x.stroke();
     }
-    if (hole) {
-      x.beginPath(); x.arc(R, R, R * (st === "cover" ? 0.07 : 0.045), 0, TAU);
+    if (st.text) drawCurvedText(x, R, st);
+    if (st.hole) {
+      x.beginPath(); x.arc(R, R, R * (st.style === "cover" ? 0.07 : 0.045), 0, TAU);
       x.fillStyle = "#fff"; x.fill();
       x.lineWidth = Math.max(1, R * 0.01); x.strokeStyle = "rgba(0,0,0,.35)"; x.stroke();
     }
     x.restore();
-    return c;
+  }
+
+  // Texto curvo sobre el borde de abajo, leyéndose de izquierda a derecha.
+  function drawCurvedText(x, R, st) {
+    const size = R * 0.13 * st.tsize / 100;
+    const rad = R * 0.97 - size * 0.75;
+    x.save();
+    x.font = "700 " + size + "px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
+    x.textAlign = "center"; x.textBaseline = "middle";
+    x.fillStyle = st.tcolor;
+    x.shadowColor = st.tcolor === "#ffffff" ? "rgba(0,0,0,.55)" : "rgba(255,255,255,.4)";
+    x.shadowBlur = size * 0.25;
+    const chars = Array.from(st.text);
+    const spacing = size * 0.06;
+    const widths = chars.map(ch => x.measureText(ch).width + spacing);
+    const total = widths.reduce((a, b) => a + b, 0);
+    let ang = Math.PI / 2 + total / rad / 2;
+    chars.forEach((ch, i) => {
+      const a = ang - widths[i] / rad / 2;
+      x.save();
+      x.translate(R + rad * Math.cos(a), R + rad * Math.sin(a));
+      x.rotate(a - Math.PI / 2);
+      x.fillText(ch, 0, 0);
+      x.restore();
+      ang -= widths[i] / rad;
+    });
+    x.restore();
   }
 
   function openPrintSheet(blobUrl, d, q, cut, title) {
@@ -492,7 +588,9 @@
         saveHist(loadHist().filter(x => !(x.svc === e.svc && x.id === e.id)));
         renderHist();
       };
-      row.append(bEdit, bCopy, bTest);
+      const bLabel = document.createElement("button"); bLabel.textContent = "🎨 Etiqueta";
+      bLabel.onclick = () => editor.fromEntry(e);
+      row.append(bEdit, bCopy, bTest, bLabel);
       if (e.img && e.c) {
         const bImg = document.createElement("button"); bImg.textContent = "⬇ Portada";
         bImg.onclick = () => downloadDataUrl(e.img, e.c + ".jpg");
@@ -628,103 +726,233 @@
     $(".copyFull").addEventListener("click", () => doCopy(true));
     showCustom();
 
-    // ----- etiqueta para imprimir -----
-    const pdet = $("details.print"), pd = $(".pd"), pq = $(".pq"), phole = $(".phole"), pcut = $(".pcut");
-    const pprev = $(".pprev"), pnote = $(".pnote");
-    const accent = COLORS[svc];
-    let pcfg = loadPrintCfg();
-    let srcCache = { key: "", val: null };
+    // llevar esta playlist (o su portada personalizada) al editor de etiquetas
+    $(".toEditor").addEventListener("click", () => {
+      if (!cur) return;
+      const img = code ? (cropper.has() ? cropper.export(1200, 0.92) : savedImg) : null;
+      editor.fromEntry({ svc, id: cur, name: name.value.trim(), img });
+    });
+  });
 
-    function syncPrintUI() {
-      pd.value = pcfg.d; pq.value = pcfg.q; phole.checked = pcfg.hole; pcut.checked = pcfg.cut;
-      card.querySelectorAll(".pst").forEach(b => b.classList.toggle("on", b.dataset.st === pcfg.st));
+  // ---------- pestañas ----------
+  const TKEY = "vinilos.pestana";
+  function showTab(name) {
+    document.querySelectorAll(".tabs button").forEach(b => b.classList.toggle("on", b.dataset.tab === name));
+    document.querySelectorAll(".tab").forEach(t => t.classList.toggle("off", t.id !== "tab-" + name));
+    try { localStorage.setItem(TKEY, name); } catch {}
+    if (name === "editor") editor.paint();
+  }
+  document.querySelectorAll(".tabs button").forEach(b => b.addEventListener("click", () => {
+    showTab(b.dataset.tab); window.scrollTo({ top: 0 });
+  }));
+
+  // ---------- editor de etiqueta ----------
+  const editor = (() => {
+    const EKEY = "vinilos.editor";
+    const RINGS = ["#1db954", "#ff0033", "#ff6600", "#ffffff", "#111111", "#f5c518", "#3a86ff"];
+    const DISCS = ["#141417", "#5b0f1a", "#0f2a5b", "#1f4d2b", "#e9e4da"];
+    const TCOLORS = ["#ffffff", "#111111", "#ff6600"];
+    const $ = id => document.getElementById(id);
+    const cv = $("edCanvas"), ctx = cv.getContext("2d"), S = cv.width;
+    const msg = $("edMsg");
+
+    const def = { style: "vinyl", label: 40, ring: "#1db954", disc: "#141417", hole: false,
+                  text: "", tsize: 100, tcolor: "#ffffff", d: 30, q: 1, cut: true };
+    let st;
+    try { st = Object.assign({}, def, JSON.parse(localStorage.getItem(EKEY)) || {}); } catch { st = Object.assign({}, def); }
+    st.zoom = 1; st.ox = 0; st.oy = 0;
+    let src = null; // { img, rect:[sx,sy,sw,sh] }
+
+    function save() {
+      const { zoom, ox, oy, ...keep } = st;
+      try { localStorage.setItem(EKEY, JSON.stringify(keep)); } catch {}
     }
-    function readPrintUI() {
-      pcfg = {
-        d: Math.min(200, Math.max(10, parseFloat(pd.value) || 30)),
-        q: Math.min(200, Math.max(1, parseInt(pq.value, 10) || 1)),
-        st: pcfg.st, hole: phole.checked, cut: pcut.checked
-      };
-      savePrintCfg(pcfg);
+    function say(t, cls) { msg.className = "msg" + (cls ? " " + cls : ""); msg.textContent = t || ""; }
+
+    function clamp() {
+      if (!src) { st.ox = st.oy = 0; return; }
+      const [, , sw, sh] = src.rect, m = Math.min(sw, sh);
+      const mx = Math.max(0, (sw / m * st.zoom - 1) / 2), my = Math.max(0, (sh / m * st.zoom - 1) / 2);
+      st.ox = Math.max(-mx, Math.min(mx, st.ox));
+      st.oy = Math.max(-my, Math.min(my, st.oy));
     }
 
-    // imagen para la etiqueta: portada personalizada o la portada de la playlist
-    async function labelSource() {
-      if (!cur) return null;
-      if (code && (cropper.has() || savedImg)) {
-        const key = "c:" + code + ":" + (cropper.has() ? "live" : "saved");
-        if (srcCache.key !== key || cropper.has()) {
-          const url = cropper.has() ? cropper.export(1200, 0.92) : savedImg;
-          srcCache = { key, val: { img: await loadImg(url), yt: false, kind: "personalizada" } };
-        }
-        return srcCache.val;
-      }
-      const key = svc + ":" + cur;
-      if (srcCache.key === key) return srcCache.val;
-      let val = null;
+    function paint() {
+      drawLabel(ctx, S, st, src);
+      $("edVinylOpts").style.display = st.style === "vinyl" ? "flex" : "none";
+      document.querySelectorAll("#edStyle button").forEach(b => b.classList.toggle("on", b.dataset.st === st.style));
+      // aviso de resolución
+      let note = "";
+      if (src) {
+        const [, , sw, sh] = src.rect;
+        const imgMM = st.style === "cover" ? st.d : st.d * st.label / 100;
+        const dpi = Math.round(Math.min(sw, sh) / st.zoom / (imgMM / 25.4));
+        note = dpi < 200
+          ? "⚠ La imagen tiene poca resolución para " + st.d + " mm (" + dpi + " dpi): puede salir borrosa."
+          : "Resolución de la imagen: OK (" + Math.min(dpi, 999) + " dpi).";
+      } else note = "Sin imagen: se imprime con la etiqueta de color.";
+      $("edNote").textContent = note;
+    }
+
+    async function setImage(url, cors, yt) {
+      const img = await loadImg(url, cors);
+      const w = img.naturalWidth, h = img.naturalHeight;
+      let rect = [0, 0, w, h];
+      if (yt) { const side = Math.min(w * 9 / 16, h); rect = [(w - side) / 2, (h - side) / 2, side, side]; }
+      src = { img, rect };
+      st.zoom = 1; st.ox = st.oy = 0; $("edZoom").value = 1;
+      paint();
+    }
+
+    async function fromPlaylist(svc, id) {
+      say("Buscando la portada…");
       try {
         const u = svc === "s"
-          ? "https://open.spotify.com/oembed?url=" + encodeURIComponent(sourceUrl("s", cur))
-          : "https://www.youtube.com/oembed?format=json&url=" + encodeURIComponent("https://www.youtube.com/playlist?list=" + cur);
+          ? "https://open.spotify.com/oembed?url=" + encodeURIComponent(sourceUrl("s", id))
+          : "https://www.youtube.com/oembed?format=json&url=" + encodeURIComponent("https://www.youtube.com/playlist?list=" + id);
         const j = await fetch(u).then(r => r.ok ? r.json() : null);
-        if (j && j.thumbnail_url) val = { img: await loadImg(j.thumbnail_url, true), yt: svc === "y", kind: "de la playlist" };
-      } catch {}
-      srcCache = { key, val };
-      return val;
+        if (!j || !j.thumbnail_url) throw 0;
+        await setImage(j.thumbnail_url, true, svc === "y");
+        say("✔ Portada de «" + (j.title || "la playlist") + "»", "ok");
+      } catch { say("No pude traer la portada de esa playlist.", "err"); }
     }
 
-    let prevTimer = null;
-    function refreshPrint() {
-      if (!pdet.open) return;
-      clearTimeout(prevTimer);
-      prevTimer = setTimeout(async () => {
-        const s = await labelSource();
-        const c = renderLabel(s, pcfg.st, pcfg.hole, 400, accent);
-        const x = pprev.getContext("2d");
-        x.clearRect(0, 0, 400, 400); x.drawImage(c, 0, 0);
-        if (!s) pnote.textContent = "No pude traer la portada; se imprime con la etiqueta de color.";
-        else {
-          const [, , side] = srcRect(s);
-          const dpi = Math.round(side / (pcfg.d / 25.4) * (pcfg.st === "cover" ? 1 : 1 / 0.38));
-          pnote.textContent = "Portada " + s.kind + (dpi < 200 ? " · ⚠ baja resolución para " + pcfg.d + " mm (" + dpi + " dpi), puede verse borrosa" : "");
-        }
-      }, 120);
+    // swatches de colores
+    function swatches(boxId, colors, key) {
+      const box = $(boxId);
+      box.textContent = "";
+      const mk = col => {
+        const b = document.createElement("button");
+        b.type = "button"; b.className = "sw" + (st[key] === col ? " on" : "");
+        b.style.background = col; b.title = col;
+        b.onclick = () => { st[key] = col; save(); swatches(boxId, colors, key); paint(); };
+        return b;
+      };
+      colors.forEach(c => box.append(mk(c)));
+      const p = document.createElement("label");
+      p.className = "sw pick" + (colors.includes(st[key]) ? "" : " on");
+      p.title = "Otro color";
+      const inp = document.createElement("input"); inp.type = "color"; inp.value = st[key];
+      inp.oninput = () => { st[key] = inp.value; save(); paint(); };
+      inp.onchange = () => swatches(boxId, colors, key);
+      p.append(inp); box.append(p);
     }
 
-    async function buildPrintBlob() {
-      readPrintUI();
-      const s = await labelSource();
-      const mm = pcfg.d + (pcfg.cut ? 2 * BLEED : 0);
+    function syncUI() {
+      $("edLabel").value = st.label; $("edHole").checked = st.hole; $("edText").value = st.text;
+      $("edTSize").value = st.tsize; $("edD").value = st.d; $("edQ").value = st.q; $("edCut").checked = st.cut;
+      swatches("edRing", RINGS, "ring"); swatches("edDisc", DISCS, "disc"); swatches("edTColor", TCOLORS, "tcolor");
+    }
+
+    function fillHist() {
+      const sel = $("edHist");
+      sel.length = 1;
+      loadHist().forEach((e, i) => {
+        const o = document.createElement("option");
+        o.value = i; o.textContent = (e.svc === "s" ? "🟢 " : "🔴 ") + (e.name || e.title || e.id) + (e.img ? " (portada propia)" : "");
+        sel.append(o);
+      });
+    }
+
+    async function exportBlob() {
+      const mm = st.d + (st.cut ? 2 * BLEED : 0);
       const N = Math.min(4000, Math.round(mm / 25.4 * DPI));
-      const c = renderLabel(s, pcfg.st, pcfg.hole, N, accent);
+      const c = document.createElement("canvas"); c.width = c.height = N;
+      drawLabel(c.getContext("2d"), N, st, src);
       return new Promise(res => c.toBlob(res, "image/png"));
     }
 
-    syncPrintUI();
-    pdet.addEventListener("toggle", refreshPrint);
-    [pd, pq].forEach(i => i.addEventListener("input", () => { readPrintUI(); refreshPrint(); }));
-    [phole, pcut].forEach(i => i.addEventListener("change", () => { readPrintUI(); refreshPrint(); }));
-    card.querySelectorAll(".pst").forEach(b => b.addEventListener("click", () => {
-      pcfg.st = b.dataset.st; savePrintCfg(pcfg); syncPrintUI(); refreshPrint();
-    }));
-    $(".pprint").addEventListener("click", async () => {
-      const blob = await buildPrintBlob();
-      const title = name.value.trim() || "Playlist";
-      openPrintSheet(URL.createObjectURL(blob), pcfg.d, pcfg.q, pcfg.cut, title);
+    // --- eventos ---
+    $("edPick").onclick = () => $("edFile").click();
+    $("edFile").onchange = async () => {
+      const f = $("edFile").files && $("edFile").files[0];
+      $("edFile").value = "";
+      if (!f) return;
+      const url = URL.createObjectURL(f);
+      try { await setImage(url, false, false); say("✔ Foto cargada. Arrastrala para acomodarla.", "ok"); }
+      catch { say("No pude abrir esa imagen.", "err"); }
+    };
+    $("edLinkBtn").onclick = () => { $("edLinkBox").classList.toggle("hidden"); $("edLink").focus(); };
+    $("edLinkPaste").onclick = async () => {
+      try { $("edLink").value = await navigator.clipboard.readText(); } catch { $("edLink").focus(); }
+    };
+    $("edLinkGo").onclick = () => {
+      const t = $("edLink").value;
+      const isYt = /youtu/i.test(t);
+      const r = parse(isYt ? "y" : "s", t);
+      if (!r.id) { say(r.err || "Pegá un link de playlist.", "err"); return; }
+      st.ring = COLORS[isYt ? "y" : "s"]; save(); syncUI();
+      fromPlaylist(isYt ? "y" : "s", r.id);
+    };
+    $("edHist").onfocus = fillHist;
+    $("edHist").onchange = () => {
+      const e = loadHist()[$("edHist").value];
+      $("edHist").value = "";
+      if (e) api.fromEntry(e, true);
+    };
+    $("edZoom").oninput = () => { st.zoom = +$("edZoom").value; clamp(); paint(); };
+    document.querySelectorAll("#edStyle button").forEach(b => b.onclick = () => { st.style = b.dataset.st; save(); clamp(); paint(); });
+    $("edLabel").oninput = () => { st.label = +$("edLabel").value; save(); paint(); };
+    $("edHole").onchange = () => { st.hole = $("edHole").checked; save(); paint(); };
+    $("edText").oninput = () => { st.text = $("edText").value; save(); paint(); };
+    $("edTSize").oninput = () => { st.tsize = +$("edTSize").value; save(); paint(); };
+    $("edD").oninput = () => { st.d = Math.min(200, Math.max(10, parseFloat($("edD").value) || 30)); save(); paint(); };
+    $("edQ").oninput = () => { st.q = Math.min(200, Math.max(1, parseInt($("edQ").value, 10) || 1)); save(); };
+    $("edCut").onchange = () => { st.cut = $("edCut").checked; save(); };
+
+    // arrastrar la imagen
+    let drag = null;
+    cv.addEventListener("pointerdown", e => {
+      if (!src) return;
+      drag = { x: e.clientX, y: e.clientY };
+      cv.setPointerCapture(e.pointerId); cv.style.cursor = "grabbing";
     });
-    $(".ppng").addEventListener("click", async () => {
-      const blob = await buildPrintBlob();
+    cv.addEventListener("pointermove", e => {
+      if (!drag) return;
+      const f = S / cv.clientWidth;
+      const D = (st.style === "cover" ? S : S * st.label / 100); // diámetro del círculo de la imagen
+      st.ox += (e.clientX - drag.x) * f / D; st.oy += (e.clientY - drag.y) * f / D;
+      drag = { x: e.clientX, y: e.clientY };
+      clamp(); paint();
+    });
+    const end = () => { drag = null; cv.style.cursor = "grab"; };
+    cv.addEventListener("pointerup", end); cv.addEventListener("pointercancel", end);
+
+    $("edPrint").onclick = async () => {
+      const blob = await exportBlob();
+      openPrintSheet(URL.createObjectURL(blob), st.d, st.q, st.cut, st.text || "Etiqueta");
+    };
+    $("edPng").onclick = async () => {
+      const blob = await exportBlob();
       const url = URL.createObjectURL(blob);
-      downloadDataUrl(url, "etiqueta-" + (code || cur) + "-" + pcfg.d + "mm.png");
+      downloadDataUrl(url, "etiqueta-" + st.d + "mm.png");
       setTimeout(() => URL.revokeObjectURL(url), 5000);
-    });
-    // refrescar la vista previa cuando cambia la playlist o la portada
-    [link, name].forEach(i => i.addEventListener("input", refreshPrint));
-    $(".zoom").addEventListener("input", refreshPrint);
-    $(".disc canvas").addEventListener("pointerup", refreshPrint);
-    cfile.addEventListener("change", () => setTimeout(refreshPrint, 300));
-    rmc.addEventListener("click", refreshPrint);
-  });
+    };
+
+    const api = {
+      paint,
+      // e: { svc, id, name?, img? } — desde «Mis llaveros» o desde una tarjeta
+      async fromEntry(e, stay) {
+        if (!stay) showTab("editor");
+        st.ring = COLORS[e.svc] || st.ring;
+        if (e.name && !st.text) st.text = e.name;
+        save(); syncUI();
+        if (e.img) {
+          try { await setImage(e.img, false, false); say("✔ Portada personalizada cargada.", "ok"); }
+          catch { await fromPlaylist(e.svc, e.id); }
+        } else await fromPlaylist(e.svc, e.id);
+        if (!stay) window.scrollTo({ top: 0 });
+      }
+    };
+
+    syncUI();
+    paint();
+    return api;
+  })();
+
+  let startTab = "link";
+  try { startTab = localStorage.getItem(TKEY) || "link"; } catch {}
+  showTab(startTab === "editor" ? "editor" : "link");
 
   renderHist();
 </script>
