@@ -159,7 +159,24 @@
 
     // Sin nombre personalizado (&n=): muestra el nombre real de la playlist.
     // Con &p=1: la etiqueta del vinilo muestra la portada (con un aro del color del servicio).
-    const wantCover = q.get("p") === "1";
+    function applyCover(url, size) {
+      const label = document.querySelector(".label");
+      label.style.background =
+        'radial-gradient(circle, var(--bg) 0 11%, rgba(255,255,255,.85) 11.5% 13%, transparent 13.5%), url("' +
+        url.replace(/"/g, "") + '") center / ' + size + ' no-repeat, #000';
+      label.classList.add("cover");
+    }
+
+    // &c=codigo → portada personalizada subida al repositorio como codigo.jpg
+    const custom = (q.get("c") || "").toLowerCase();
+    const hasCustom = /^[a-z0-9]{3,12}$/.test(custom);
+    if (hasCustom) {
+      const img = new Image();
+      img.onload = () => applyCover(img.src, "cover");
+      img.src = custom + ".jpg";
+    }
+
+    const wantCover = q.get("p") === "1" && !hasCustom;
     if (!name || wantCover) {
       const oembed = key === "s"
         ? "https://open.spotify.com/oembed?url=" + encodeURIComponent("https://open.spotify.com/playlist/" + id)
@@ -171,14 +188,8 @@
         const thumb = info.thumbnail_url;
         if (wantCover && thumb && /^https:\/\//.test(thumb)) {
           const img = new Image();
-          img.onload = () => {
-            const size = key === "y" ? "auto 135%" : "cover"; // YouTube trae franjas negras
-            const label = document.querySelector(".label");
-            label.style.background =
-              'radial-gradient(circle, var(--bg) 0 11%, rgba(255,255,255,.85) 11.5% 13%, transparent 13.5%), url("' +
-              thumb.replace(/"/g, "") + '") center / ' + size + ' no-repeat, #000';
-            label.classList.add("cover");
-          };
+          // YouTube trae franjas negras, por eso se agranda
+          img.onload = () => applyCover(thumb, key === "y" ? "auto 135%" : "cover");
           img.src = thumb;
         }
       }).catch(() => {});
