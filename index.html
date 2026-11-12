@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Tu playlist</title>
+<style>
+  :root { --bg:#111114; --fg:#f4f4f6; --muted:#9a9aa3; --accent:#ff0033; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; }
+  body {
+    background:var(--bg); color:var(--fg);
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    padding:24px 16px; text-align:center; gap:22px;
+  }
+  .vinyl {
+    width:min(62vw,240px); aspect-ratio:1; border-radius:50%;
+    background:
+      radial-gradient(circle, var(--bg) 0 3.5%, var(--accent) 3.6% 30%, #1b1b1f 30.5% 100%),
+      #1b1b1f;
+    box-shadow:0 0 0 2px #2a2a30, 0 18px 40px rgba(0,0,0,.5);
+    position:relative; animation:spin 4s linear infinite;
+  }
+  .vinyl::after {
+    content:""; position:absolute; inset:8%; border-radius:50%;
+    background:repeating-radial-gradient(circle, transparent 0 6px, rgba(255,255,255,.05) 6px 7px);
+    -webkit-mask:radial-gradient(circle, transparent 0 36%, #000 36.5%);
+            mask:radial-gradient(circle, transparent 0 36%, #000 36.5%);
+  }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  @media (prefers-reduced-motion:reduce) { .vinyl { animation:none; } }
+  h1 { margin:0; font-size:1.6rem; }
+  p { margin:0; color:var(--muted); }
+  .btn {
+    display:block; width:min(100%,360px); padding:18px 20px; border-radius:999px;
+    background:var(--accent); color:#fff; font-size:1.15rem; font-weight:700;
+    text-decoration:none; box-shadow:0 8px 24px rgba(0,0,0,.35);
+  }
+  .btn:active { transform:scale(.98); }
+  .alt { color:var(--muted); font-size:.9rem; }
+  .brand { margin-top:8px; font-size:.85rem; color:var(--muted); }
+  .brand a { color:var(--fg); }
+  .hidden { display:none; }
+</style>
+</head>
+<body>
+  <div class="vinyl" aria-hidden="true"></div>
+  <div>
+    <h1 id="title">Tu playlist</h1>
+    <p id="sub">Tocá el botón para escucharla</p>
+  </div>
+  <a id="open" class="btn hidden" href="#">▶ Abrir</a>
+  <a id="web" class="alt hidden" href="#">¿No se abre? Escuchala en el navegador</a>
+  <div class="brand" id="brand"></div>
+
+<script>
+  // ===== Personalizá acá =====
+  const MARCA = "";       // ej: "Vinilos Shiko"
+  const INSTAGRAM = "";   // ej: "vinilos.shiko" (sin @)
+  // ===========================
+
+  const q = new URLSearchParams(location.search);
+  const ID = /^[A-Za-z0-9_-]{2,80}$/;
+  const ua = navigator.userAgent;
+  const isAndroid = /Android/i.test(ua);
+
+  const services = {
+    y: { name: "YouTube Music", color: "#ff0033", pkg: "com.google.android.apps.youtube.music",
+         path: id => "music.youtube.com/playlist?list=" + id },
+    s: { name: "Spotify", color: "#1db954", pkg: "com.spotify.music",
+         path: id => "open.spotify.com/playlist/" + id },
+  };
+
+  const key = Object.keys(services).find(k => ID.test(q.get(k) || ""));
+  const $ = id => document.getElementById(id);
+
+  const name = (q.get("n") || "").slice(0, 60);
+  if (name) { $("title").textContent = name; document.title = name; }
+
+  if (MARCA || INSTAGRAM) {
+    const b = $("brand");
+    if (MARCA) b.append(MARCA);
+    if (INSTAGRAM) {
+      if (MARCA) b.append(" · ");
+      const a = document.createElement("a");
+      a.href = "https://instagram.com/" + INSTAGRAM;
+      a.textContent = "@" + INSTAGRAM;
+      b.append(a);
+    }
+  }
+
+  if (!key) {
+    $("sub").textContent = "Este llavero no tiene una playlist válida.";
+  } else {
+    const sv = services[key];
+    const id = q.get(key);
+    const web = "https://" + sv.path(id);
+    // En Android se le pasa el link directo a la app (igual que WhatsApp).
+    const href = isAndroid
+      ? "intent://" + sv.path(id) + "#Intent;scheme=https;package=" + sv.pkg +
+        ";S.browser_fallback_url=" + encodeURIComponent(web) + ";end"
+      : web;
+
+    document.documentElement.style.setProperty("--accent", sv.color);
+    const btn = $("open");
+    btn.href = href;
+    btn.textContent = "▶ Abrir en " + sv.name;
+    btn.classList.remove("hidden");
+    const alt = $("web");
+    alt.href = web;
+    alt.classList.remove("hidden");
+
+    // Intento automático en Android (si el navegador lo bloquea, queda el botón).
+    if (isAndroid) setTimeout(() => { location.href = href; }, 400);
+  }
+</script>
+</body>
+</html>
