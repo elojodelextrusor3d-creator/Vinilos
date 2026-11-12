@@ -38,6 +38,7 @@
       radial-gradient(circle, var(--bg) 0 11%, transparent 11.5%),
       conic-gradient(var(--accent) 0 320deg, rgba(255,255,255,.9) 320deg 338deg, var(--accent) 338deg);
   }
+  .label.cover { inset:31%; box-shadow:0 0 0 4px var(--accent); }
   @keyframes spin { to { transform:rotate(360deg); } }
   h1 { margin:0; font-size:1.6rem; }
   p { margin:0; color:var(--muted); }
@@ -130,13 +131,29 @@
     // Se abre solo con el toque en el botón.
 
     // Sin nombre personalizado (&n=): muestra el nombre real de la playlist.
-    if (!name) {
+    // Con &p=1: la etiqueta del vinilo muestra la portada (con un aro del color del servicio).
+    const wantCover = q.get("p") === "1";
+    if (!name || wantCover) {
       const oembed = key === "s"
         ? "https://open.spotify.com/oembed?url=" + encodeURIComponent("https://open.spotify.com/playlist/" + id)
         : "https://www.youtube.com/oembed?format=json&url=" +
           encodeURIComponent("https://www.youtube.com/playlist?list=" + id);
       fetch(oembed).then(r => r.ok ? r.json() : null).then(info => {
-        if (info && info.title) { $("title").textContent = info.title; document.title = info.title; }
+        if (!info) return;
+        if (!name && info.title) { $("title").textContent = info.title; document.title = info.title; }
+        const thumb = info.thumbnail_url;
+        if (wantCover && thumb && /^https:\/\//.test(thumb)) {
+          const img = new Image();
+          img.onload = () => {
+            const size = key === "y" ? "auto 135%" : "cover"; // YouTube trae franjas negras
+            const label = document.querySelector(".label");
+            label.style.background =
+              'radial-gradient(circle, var(--bg) 0 11%, rgba(255,255,255,.85) 11.5% 13%, transparent 13.5%), url("' +
+              thumb.replace(/"/g, "") + '") center / ' + size + ' no-repeat, #000';
+            label.classList.add("cover");
+          };
+          img.src = thumb;
+        }
       }).catch(() => {});
     }
   }
