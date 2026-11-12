@@ -103,9 +103,6 @@
     const href = isAndroid
       ? intentBase + ";S.browser_fallback_url=" + encodeURIComponent(web) + ";end"
       : web;
-    // Intento automático SIN fallback: cuando la página viene de un NFC, Chrome
-    // bloquea abrir la app sin un toque y saltaría a la web; así solo queda el botón.
-    const autoHref = intentBase + ";end";
 
     document.documentElement.style.setProperty("--accent", sv.color);
     const btn = $("open");
@@ -116,8 +113,8 @@
     alt.href = web;
     alt.classList.remove("hidden");
 
-    // Intento automático en Android (si el navegador lo bloquea, queda el botón).
-    if (isAndroid) setTimeout(() => { location.href = autoHref; }, 400);
+    // Sin apertura automática: desde un NFC el navegador la desvía a la web.
+    // Se abre solo con el toque en el botón.
   }
 </script>
 </body>
