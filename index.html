@@ -69,7 +69,12 @@
   const INSTAGRAM = "";   // ej: "vinilos.shiko" (sin @)
   // ===========================
 
+  // Tolera links pegados con basura al final (ej: "?si=..." de Spotify).
   const q = new URLSearchParams(location.search);
+  for (const k of ["s", "y"]) {
+    const v = q.get(k);
+    if (v) q.set(k, v.split(/[^A-Za-z0-9_-]/)[0]);
+  }
   const ID = /^[A-Za-z0-9_-]{2,80}$/;
   const ua = navigator.userAgent;
   const isAndroid = /Android/i.test(ua);
@@ -123,6 +128,17 @@
 
     // Sin apertura automática: desde un NFC el navegador la desvía a la web.
     // Se abre solo con el toque en el botón.
+
+    // Sin nombre personalizado (&n=): muestra el nombre real de la playlist.
+    if (!name) {
+      const oembed = key === "s"
+        ? "https://open.spotify.com/oembed?url=" + encodeURIComponent("https://open.spotify.com/playlist/" + id)
+        : "https://www.youtube.com/oembed?format=json&url=" +
+          encodeURIComponent("https://www.youtube.com/playlist?list=" + id);
+      fetch(oembed).then(r => r.ok ? r.json() : null).then(info => {
+        if (info && info.title) { $("title").textContent = info.title; document.title = info.title; }
+      }).catch(() => {});
+    }
   }
 </script>
 </body>
