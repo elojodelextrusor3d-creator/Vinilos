@@ -98,10 +98,14 @@
     const id = q.get(key);
     const web = "https://" + sv.path(id);
     // En Android se le pasa el link directo a la app (igual que WhatsApp).
+    const intentBase = "intent://" + sv.path(id) + "#Intent;scheme=https;package=" + sv.pkg;
+    // Botón (toque del usuario): si no está la app, cae a la web.
     const href = isAndroid
-      ? "intent://" + sv.path(id) + "#Intent;scheme=https;package=" + sv.pkg +
-        ";S.browser_fallback_url=" + encodeURIComponent(web) + ";end"
+      ? intentBase + ";S.browser_fallback_url=" + encodeURIComponent(web) + ";end"
       : web;
+    // Intento automático SIN fallback: cuando la página viene de un NFC, Chrome
+    // bloquea abrir la app sin un toque y saltaría a la web; así solo queda el botón.
+    const autoHref = intentBase + ";end";
 
     document.documentElement.style.setProperty("--accent", sv.color);
     const btn = $("open");
@@ -113,7 +117,7 @@
     alt.classList.remove("hidden");
 
     // Intento automático en Android (si el navegador lo bloquea, queda el botón).
-    if (isAndroid) setTimeout(() => { location.href = href; }, 400);
+    if (isAndroid) setTimeout(() => { location.href = autoHref; }, 400);
   }
 </script>
 </body>
