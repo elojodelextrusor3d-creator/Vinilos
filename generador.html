@@ -130,12 +130,33 @@
   .item button, .item .btn { padding:9px 10px; font-size:.85rem; }
   .item .del { flex:0 0 auto; background:transparent; color:#ff8080; }
   .empty { color:var(--muted); font-size:.9rem; text-align:center; padding:8px; }
+
+  /* Etiquetas de precio */
+  .pritem { display:grid; grid-template-columns:1fr 1fr; gap:6px; padding:10px; border-radius:12px; background:#101013; }
+  .pritem input {
+    width:100%; min-width:0; padding:10px 11px; border-radius:10px; border:1px solid var(--line);
+    background:#0b0b0d; color:var(--fg); font-size:.95rem; font-family:inherit;
+  }
+  .pritem .wide { grid-column:1 / -1; }
+  .pritem .qrow { display:flex; gap:6px; align-items:center; }
+  .pritem .qrow input { flex:1 1 auto; }
+  .pritem .del { flex:0 0 auto; padding:9px 10px; background:transparent; color:#ff8080; }
+  #prList { display:flex; flex-direction:column; gap:8px; }
+  .prprev { display:flex; flex-wrap:wrap; gap:10px; justify-content:center; padding:10px; border-radius:12px; background:#2a2a31; }
+  .prprev .pv { position:relative; }
+  .prprev canvas { display:block; box-shadow:0 2px 8px rgba(0,0,0,.45); }
+  .prprev .qb {
+    position:absolute; top:-7px; right:-7px; background:#f60; color:#fff; font-size:.72rem; font-weight:700;
+    border-radius:10px; padding:2px 7px;
+  }
+  #prPrint { background:#f60; color:#fff; }
 </style>
 </head>
 <body>
   <nav class="tabs">
-    <button data-tab="link">🔗 Generar link</button>
-    <button data-tab="editor">🎨 Editor de etiqueta</button>
+    <button data-tab="link">🔗 Links</button>
+    <button data-tab="editor">🎨 Etiqueta</button>
+    <button data-tab="precios">🏷 Precios</button>
   </nav>
 
   <div id="tab-link" class="tab">
@@ -277,6 +298,61 @@
       <div class="small">Al imprimir elegí tamaño <b>100 % / real</b>, sin “ajustar a la página”. Imprimí una de prueba y medila.</div>
     </section>
   </div><!-- /tab-editor -->
+
+  <div id="tab-precios" class="tab">
+    <h1>Etiquetas de precio</h1>
+    <p class="intro">Cargá cada producto con su nombre y precio, elegí el diseño y mandalas a imprimir.</p>
+
+    <section class="card" style="--c:#f60">
+      <h2>1 · Productos</h2>
+      <div id="prList"></div>
+      <div class="row">
+        <button id="prAdd">➕ Agregar producto</button>
+      </div>
+      <select id="prHist" class="sel"><option value="">… o agregar uno de «Mis llaveros»</option></select>
+    </section>
+
+    <section class="card" style="--c:#f60">
+      <h2>2 · Diseño</h2>
+      <label>Tamaño (mm)</label>
+      <div class="row seg" id="prSize">
+        <button data-sz="40x25">40×25</button>
+        <button data-sz="50x30">50×30</button>
+        <button data-sz="60x40">60×40</button>
+        <button data-sz="custom">Otro</button>
+      </div>
+      <div class="pgrid" id="prCustom">
+        <label>Ancho (mm)<input type="number" id="prW" min="20" max="150" step="1"></label>
+        <label>Alto (mm)<input type="number" id="prH" min="15" max="150" step="1"></label>
+      </div>
+      <label>Fondo</label>
+      <div class="row seg" id="prBg">
+        <button data-bg="light">Blanco (menos tinta)</button>
+        <button data-bg="color">De color</button>
+      </div>
+      <label>Color</label>
+      <div class="swatches" id="prColor"></div>
+      <label>Moneda</label>
+      <input class="link" id="prCur" maxlength="5" placeholder="$" autocomplete="off">
+      <label class="chk"><input type="checkbox" id="prLogo"> Logo de El Ojo del Extrusor</label>
+      <label class="chk"><input type="checkbox" id="prIg"> Mostrar @elojodelextrusor3d</label>
+      <label class="chk"><input type="checkbox" id="prHole"> Agujero para colgar</label>
+      <label class="chk"><input type="checkbox" id="prRound"> Esquinas redondeadas</label>
+    </section>
+
+    <section class="card" style="--c:#f60">
+      <h2>3 · Imprimir</h2>
+      <label>Vista previa</label>
+      <div class="prprev" id="prPrev"></div>
+      <label class="chk"><input type="checkbox" id="prCut"> Línea de corte (con 1 mm de sangrado)</label>
+      <div class="small" id="prTotal"></div>
+      <div class="row">
+        <button class="main" id="prPrint">🖨 Imprimir</button>
+        <button id="prPng">⬇ Descargar PNG</button>
+      </div>
+      <div class="small">Al imprimir elegí tamaño <b>100 % / real</b>, sin “ajustar a la página”.</div>
+    </section>
+  </div><!-- /tab-precios -->
 
 <script>
   const BASE = "elojodelextrusor3d-creator.github.io/Vinilos/";
@@ -790,6 +866,7 @@
     document.querySelectorAll(".tab").forEach(t => t.classList.toggle("off", t.id !== "tab-" + name));
     try { localStorage.setItem(TKEY, name); } catch {}
     if (name === "editor") editor.paint();
+    if (name === "precios") precios.refresh();
   }
   document.querySelectorAll(".tabs button").forEach(b => b.addEventListener("click", () => {
     showTab(b.dataset.tab); window.scrollTo({ top: 0 });
@@ -1008,9 +1085,313 @@
     return api;
   })();
 
+  // ---------- etiquetas de precio ----------
+  const precios = (() => {
+    const PKEY = "vinilos.precios";
+    const FONT = 'system-ui,-apple-system,"Segoe UI",Roboto,sans-serif';
+    const PCOLORS = ["#ff6600", "#1db954", "#ff0033", "#111111", "#3a86ff", "#f5c518", "#8e44ad"];
+    const LOGO_W = ["M225.46,38.04c.4-.4.87-.6,1.43-.6h16.1v-6.03h-16.1q-3.36,0-5.7,2.35t-2.35,5.7v14.1q0,3.33,2.35,5.7,2.340,2.36,5.7,2.35h16.1v-6.05h-16.1c-.56,0-1.03-.19-1.430-.59s-.59-.87-.59-1.41v-4.03h10.07v-6.03h-10.070v-4.03c0-.54.19-1.020.59-1.41v-.02Z","M253.42,55.55c-.56,0-1.03-.19-1.43-.59-.38-.4-.59-.87-.59-1.41v-22.15h-6.03v22.15q0,3.330,2.35,5.7t5.7,2.35h14.08v-6.05H253.42Z","M458.68,35.52c-2.75-2.75-6.08-4.12-9.96-4.12h-2.02q-3.33,0-5.7,2.35t-2.35,5.7v22.15h8.05q6.66,0,11.39-4.72,4.73-4.73,4.72-11.39,0-5.84-4.14-9.96h0ZM453.82,52.61c-1.97,1.97-4.34,2.94-7.12,2.94h-2.02v-16.1c0-.54.21-1.02.6-1.41q.6-.6,1.41-.6h2.02c2.22,0,4.12.79,5.7,2.35q2.36,2.35,2.35,5.7c0,2.78-.99,5.15-2.94,7.12h0Z","M473.47,38.04q.6-.6,1.41-.6h16.12v-6.03h-16.12q-3.33,0-5.7,2.35t-2.35,5.7v14.1q0,3.33,2.35,5.7,2.36,2.36,5.7,2.35h16.12v-6.05h-16.12c-.54,0-1.02-.19-1.41-.59s-.6-.87-.6-1.41v-4.03h10.07v-6.03h-10.07v-4.03c0-.54.21-1.02.6-1.41V38.04Z","M503.07,55.55c-.54,0-1.02-.19-1.41-.59-.4-.4-.59-.87-.59-1.41v-22.15h-6.05v22.15c0,2.22.79,4.12,2.35,5.7q2.36,2.35,5.7,2.35h14.1v-6.05H503.07Z","M172.83,139.51c-4.72,0-8.8-1.69-12.13-5.02s-5.01-7.41-5.01-12.13v-27.05c0-4.72,1.69-8.8,5.01-12.130,3.33-3.33,7.41-5.02,12.13-5.02h32.6v14.96h-32.6c-.61,0-1.09.21-1.53.65s-.65.92-.65,1.53v6.04h19.32v14.96h-19.32v6.04c0,.61.2,1.09.65,1.53s.92.65,1.53.65h32.6v14.96h-32.6v.03Z","M244.58,139.51v-13.28c0-2.75-.95-5.05-2.91-7-1.96-1.96-4.25-2.91-7-2.91s-5.050.95-7,2.91c-1.96,1.96-2.91,4.25-2.91,7v13.28h-14.96v-13.28c0-6.75,2.39-12.61,7.09-17.41-4.71-4.78-7.09-10.62-7.09-17.37v-13.28h14.96v13.28c0,2.76.95,5.05,2.91,7,1.96,1.96,4.25,2.91,7,2.91s5.05-.95,7-2.91c1.96-1.96,2.91-4.25,2.91-7v-13.28h14.96v13.28c0,6.75-2.37,12.59-7.05,17.37,4.68,4.8,7.05,10.66,7.05,17.41v13.28H244.58Z","M279.36 139.51 279.36 93.14 263.9 93.14 263.9 78.17 309.78 78.17 309.78 93.14 294.32 93.14 294.32 139.51 279.36 139.51Z","M363.89,99.19v-3.87c0-4.72-1.69-8.8-5.02-12.13-3.33-3.33-7.4-5.02-12.13-5.02h-15.45c-4.72,0-8.8,1.69-12.13,5.02-3.34,3.33-5.02,7.4-5.02,12.13v44.2h14.95v-23.19h1.82c1.47,5.06,4.24,9.64,8.26,13.61,6.33,6.36,14.07,9.58,23.02,9.58h1.69v-14.97h-1.69c-4.9,0-8.98-1.69-12.45-5.2-.97-.94-1.8-1.96-2.5-3.030,4.5-.12,8.42-1.8,11.63-5C362.2,107.99,363.89,103.9,363.89,99.19ZM348.92,99.19c0,.6-.19,1.07-.65,1.53-.44.44-.91.65-1.53.65h-17.65v-6.05c0-.62.21-1.09.65-1.53s.94-.65,1.55-.65h15.45c.6,0,1.09.21,1.53.65.46.44.65.91.65,1.53V99.19Z","M385.39,139.51c-4.72,0-8.8-1.69-12.13-5.02-3.33-3.33-5.02-7.41-5.02-12.13v-44.2h14.96v44.2c0,.61.2,1.090.65,1.53.45.45.92.65,1.53.65h15.46c.61,0,1.09-.2,1.53-.65.45-.45.65-.92.65-1.53v-44.2h14.96v44.2c0,4.72-1.69,8.8-5.02,12.13s-7.41,5.02-12.13,5.02h-15.46H385.39Z","M439.49,139.51c-4.72,0-8.8-1.69-12.13-5.02-3.33-3.33-5.02-7.41-5.02-12.13v-1.68h14.96v1.68c0,.61.2,1.09.65,1.53.45.45.92.65,1.53.65h15.46c.61,0,1.09-.2,1.53-.65.45-.45.65-.92.65-1.53v-3.86c0-.61-.21-1.09-.65-1.53-.45-.45-.92-.65-1.53-.65h-15.46c-4.72,0-8.8-1.69-12.13-5.01-3.33-3.33-5.02-7.41-5.02-12.13v-3.86c0-4.72,1.69-8.8,5.02-12.130,3.33-3.33,7.41-5.02,12.13-5.02h15.46c4.72,0,8.8,1.69,12.13,5.02,3.33,3.33,5.02,7.41,5.02,12.13v1.68h-14.96v-1.68c0-.61-.2-1.09-.65-1.53-.45-.45-.92-.65-1.53-.65h-15.46c-.61,0-1.09.21-1.53.65-.45.45-.65.92-.65,1.53v3.86c0,.61.2,1.09.65,1.53.44.44.93.65,1.53.65h15.46c4.72,0,8.8,1.69,12.13,5.02,3.33,3.33,5.02,7.41,5.02,12.13v3.86c0,4.72-1.69,8.8-5.02,12.13s-7.41,5.02-12.13,5.02h-15.46Z","M521.18,83.19c-3.33-3.33-7.4-5.02-12.13-5.02h-15.45c-4.72,0-8.8,1.69-12.13,5.02-3.34,3.33-5.02,7.4-5.02,12.13v27.05c0,4.72,1.68,8.8,5.02,12.13,3.33,3.33,7.4,5.02,12.13,5.02h15.45c4.72,0,8.8-1.69,12.13-5.02s5.02-7.4,5.02-12.13v-27.05C526.2,90.6,524.51,86.52,521.18,83.19ZM511.23,122.37c0,.62-.19,1.09-.65,1.53-.44.46-.91.65-1.53.65h-15.45c-.62,0-1.09-.19-1.55-.65-.44-.44-.63-.91-.63-1.53v-27.05c0-.62.19-1.09.63-1.53s.94-.65,1.55-.65h15.45c.62,0,1.09.19,1.53.65.46.44.65.91.65,1.53C511.23,95.32,511.23,122.37,511.23,122.37Z","M580.3,99.19v-3.87c0-4.72-1.68-8.8-5.02-12.13-3.33-3.33-7.4-5.02-12.13-5.02h-15.45c-4.72,0-8.8,1.69-12.13,5.02-3.33,3.33-5.02,7.4-5.02,12.13v44.2h14.97v-23.19h1.81c1.47,5.06,4.25,9.64,8.26,13.61,6.33,6.36,14.08,9.58,23.03,9.58h1.68v-14.97h-1.68c-4.92,0-8.99-1.69-12.47-5.2-.96-.94-1.8-1.96-2.49-3.03,4.5-.12,8.4-1.8,11.61-5,3.34-3.33,5.02-7.42,5.020-12.13h0ZM565.35,99.19c0,.6-.21,1.07-.65,1.53-.46.44-.93.65-1.55.65h-17.63v-6.05c0-.62.19-1.09.65-1.53.44-.44.93-.65,1.53-.65h15.45c.62,0,1.09.19,1.55.65.44.44.65.91.65,1.53v3.87H565.35Z","M96.79,126.58l-5.5,5.5-19.83,17.24-6.87,9.46-6.89-9.46-19.83-17.24-5.5-5.5,16-16c4.87,2.42,10.37,3.79,16.21,3.79s11.34-1.36,16.23-3.79l16,16H96.79Z","M85.87,22.56c-4.24-1.36-8.68-2.32-13.27-2.84-2.63-.29-5.32-.45-8.03-.45s-5.4.16-8.02.45c-4.59.52-9.02,1.48-13.25,2.83C18.09,30.6,0,52.52,0,78.33c0,23.9,15.52,44.49,37.87,53.75,8.14,3.41,17.16,5.29,26.69,5.29s18.59-1.89,26.73-5.29c22.34-9.27,37.87-29.85,37.87-53.75,0-25.8-18.08-47.73-43.290-55.77h0ZM80.79,110.58c-4.89,2.42-10.39,3.8-16.23,3.8s-11.33-1.37-16.21-3.8c-11.92-5.9-20.13-18.14-20.13-32.25,0-19.92,16.27-36.06,36.34-36.06s36.37,16.14,36.37,36.06C100.93,92.44,92.74,104.68,80.79,110.58Z","M43.29 19.72h42.58v9.12h-42.58Z","M29.74 0h69.67v19.72h-69.67Z"], LOGO_O = ["M326.46,23.76c-2.97-2.97-6.62-4.49-10.83-4.49h-13.61c-4.22,0-7.86,1.52-10.83,4.49-2.97,2.96-4.47,6.61-4.47,10.82v23.84c0,4.21,1.5,7.84,4.47,10.82,2.97,2.97,6.61,4.47,10.83,4.47h13.61c4.21,0,7.86-1.5,10.83-4.47,2.96-2.97,4.47-6.61,4.47-10.82v-23.84C330.93,30.37,329.41,26.72,326.46,23.76ZM317.35,58.42c0,.47-.16.85-.52,1.21s-.72.5-1.21.5h-13.61c-.49,0-.85-.15-1.22-.5-.35-.35-.5-.74-.5-1.21v-23.84c0-.49.15-.85.52-1.21.35-.35.72-.52,1.21-.52h13.61c.49,0,.85.16,1.21.52s.52.72.52,1.21v23.84H317.35Z","M348.66,73.72c-4.21,0-7.86-1.51-10.83-4.48s-4.48-6.61-4.48-10.83v-1.68h13.58v1.68c0,.48.16.86.51,1.21s.73.51,1.21.51h6.81c.48,0,.86-.16,1.21-.51s.51-.73.51-1.21V19.28h13.58v39.13c0,4.21-1.51,7.85-4.48,10.83-2.97,2.97-6.61,4.48-10.83,4.48h-6.81.02Z","M414.97,23.76c-2.97-2.97-6.61-4.49-10.82-4.49h-13.63c-4.21,0-7.84,1.52-10.82,4.49-2.97,2.96-4.47,6.61-4.47,10.82v23.84c0,4.21,1.5,7.84,4.47,10.82,2.97,2.97,6.61,4.47,10.82,4.47h13.63c4.21,0,7.84-1.5,10.82-4.47,2.97-2.97,4.47-6.61,4.47-10.82v-23.84C419.44,30.37,417.94,26.72,414.97,23.76ZM405.87,58.42c0,.47-.16.85-.52,1.21-.35.35-.72.5-1.21.5h-13.63c-.47,0-.85-.15-1.21-.5s-.52-.74-.52-1.21v-23.84c0-.49.16-.85.52-1.21s.74-.52,1.21-.52h12.61c.49,0,1.870.16,2.22.52.35.35.52.72.52,1.21v23.84H405.87Z","M86.98,78.61c0,12.37-10.03,22.39-22.41,22.39s-22.39-10.02-22.39-22.39c0-4.59,1.38-8.86,3.75-12.4,1.03,4.58,5.13,8,10.02,8,5.67,0,10.27-4.6,10.27-10.27,0-3.04-1.32-5.77-3.41-7.64.58-.05,1.16-.07,1.75-.07,12.37,0,22.41,10.02,22.41,22.39h.01Z","M57.7 149.32 57.7 154.9 64.58 158.71 71.46 154.9 71.46 149.32 57.7 149.32Z"];
+    const $ = id => document.getElementById(id);
+    const def = {
+      items: [{ name: "Llavero vinilo NFC", detail: "Con tu playlist", price: "5000", q: 1 }],
+      w: 50, h: 30, sz: "50x30", bg: "light", color: "#ff6600", cur: "$",
+      logo: true, ig: true, hole: false, round: true, cut: true
+    };
+    let st;
+    try { st = Object.assign({}, def, JSON.parse(localStorage.getItem(PKEY)) || {}); } catch { st = Object.assign({}, def); }
+    if (!Array.isArray(st.items)) st.items = def.items.slice();
+    let timer, logoP;
+
+    function save() { try { localStorage.setItem(PKEY, JSON.stringify(st)); } catch {} }
+    function changed() { save(); clearTimeout(timer); timer = setTimeout(renderPrev, 120); }
+
+    function textOn(hex) {
+      const n = parseInt(hex.slice(1), 16), r = n >> 16 & 255, g = n >> 8 & 255, b = n & 255;
+      return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.62 ? "#111111" : "#ffffff";
+    }
+    function fmtPrice(p) {
+      const raw = String(p || "").trim();
+      const v = raw.replace(/[^\d.,]/g, "");
+      if (/^\d+$/.test(v)) return Number(v).toLocaleString("es-AR");
+      return v || raw;
+    }
+    function rrect(x, a, b, w, h, r) {
+      r = Math.max(0, Math.min(r, w / 2, h / 2));
+      x.beginPath();
+      x.moveTo(a + r, b); x.arcTo(a + w, b, a + w, b + h, r); x.arcTo(a + w, b + h, a, b + h, r);
+      x.arcTo(a, b + h, a, b, r); x.arcTo(a, b, a + w, b, r); x.closePath();
+    }
+    function fit(x, text, weight, size, maxW) {
+      x.font = weight + " " + size + "px " + FONT;
+      const w = x.measureText(text).width;
+      if (w > maxW) { size *= maxW / w; x.font = weight + " " + size + "px " + FONT; }
+      return size;
+    }
+    function drawLogo(x, left, top, hgt, main, accent) {
+      if (!logoP) logoP = { w: LOGO_W.map(d => new Path2D(d)), o: LOGO_O.map(d => new Path2D(d)) };
+      const s = hgt / 158.78;
+      x.save(); x.translate(left, top); x.scale(s, s);
+      x.fillStyle = main; logoP.w.forEach(p => x.fill(p));
+      x.fillStyle = accent; logoP.o.forEach(p => x.fill(p));
+      x.restore();
+    }
+
+    // dibuja una etiqueta; k = px por mm, bl = sangrado en mm
+    function drawTag(x, k, it, bl) {
+      const W = st.w * k, H = st.h * k, B = bl * k, m = v => v * k;
+      const light = st.bg === "light";
+      const bgc = light ? "#ffffff" : st.color;
+      const ink = light ? "#111111" : textOn(st.color);
+      const acc = light ? (st.color === "#ffffff" ? "#111111" : st.color) : ink;
+      x.save();
+      x.fillStyle = bgc; x.fillRect(0, 0, W + 2 * B, H + 2 * B);
+      x.translate(B, B);
+
+      // marco
+      const fi = m(1.3), lw = m(light ? 0.7 : 0.35);
+      x.strokeStyle = light ? acc : ink; x.globalAlpha = light ? 1 : 0.7; x.lineWidth = lw;
+      rrect(x, fi, fi, W - 2 * fi, H - 2 * fi, st.round ? m(1.8) : 0); x.stroke();
+      x.globalAlpha = 1;
+
+      const pad = fi + m(Math.min(st.w, st.h) * 0.06 + 0.6);
+      let L = pad;
+      if (st.hole) {
+        const r = m(1.6), cx = fi + m(1.4) + r;
+        x.beginPath(); x.arc(cx, H / 2, r, 0, Math.PI * 2);
+        x.fillStyle = "#ffffff"; x.fill();
+        x.setLineDash([m(0.6), m(0.4)]); x.lineWidth = m(0.25); x.strokeStyle = "#888"; x.stroke(); x.setLineDash([]);
+        L = cx + r + m(1.5);
+      }
+      const R = W - pad, T = pad, Bt = H - pad, cw = R - L, ch = Bt - T, mid = (L + R) / 2;
+      x.textAlign = "center"; x.textBaseline = "top"; x.fillStyle = ink;
+
+      let y = T;
+      const name = (it.name || "").trim(), detail = (it.detail || "").trim();
+      if (name) {
+        const nh = ch * 0.2;
+        let s = fit(x, name, "800", nh, cw);
+        if (s < nh * 0.62 && name.includes(" ")) {
+          // en dos líneas
+          const w = name.split(" "); let best = null;
+          for (let i = 1; i < w.length; i++) {
+            const a = w.slice(0, i).join(" "), b = w.slice(i).join(" ");
+            x.font = "800 " + nh + "px " + FONT;
+            const mx = Math.max(x.measureText(a).width, x.measureText(b).width);
+            if (!best || mx < best.mx) best = { a, b, mx };
+          }
+          s = Math.min(nh * 0.8, nh * cw / best.mx);
+          x.font = "800 " + s + "px " + FONT;
+          x.fillText(best.a, mid, y); y += s * 1.08;
+          x.fillText(best.b, mid, y); y += s * 1.15;
+        } else { x.fillText(name, mid, y); y += s * 1.18; }
+      }
+      if (detail) {
+        const s = fit(x, detail, "500", ch * 0.12, cw);
+        x.globalAlpha = 0.72; x.fillText(detail, mid, y); x.globalAlpha = 1;
+        y += s * 1.25;
+      }
+
+      // pie: logo + instagram
+      let foot = Bt;
+      if (st.logo || st.ig) {
+        const fh = ch * 0.15, ig = "@elojodelextrusor3d";
+        x.font = "600 " + fh * 0.62 + "px " + FONT;
+        const lW = st.logo ? fh * 580.3 / 158.78 : 0, gap = st.logo && st.ig ? fh * 0.4 : 0;
+        const tW = st.ig ? x.measureText(ig).width : 0;
+        const sc = Math.min(1, cw / (lW + gap + tW)), h2 = fh * sc;
+        foot = Bt - h2;
+        let fx = mid - (lW + gap + tW) * sc / 2;
+        if (st.logo) {
+          const accent = light ? "#ff6600" : (st.color === "#ff6600" ? ink : "#ff6600");
+          drawLogo(x, fx, foot, h2, ink, accent);
+          fx += (lW + gap) * sc;
+        }
+        if (st.ig) {
+          x.font = "600 " + fh * 0.62 * sc + "px " + FONT;
+          x.textAlign = "left"; x.textBaseline = "middle"; x.globalAlpha = 0.8;
+          x.fillText(ig, fx, foot + h2 / 2);
+          x.globalAlpha = 1; x.textAlign = "center";
+        }
+        foot -= ch * 0.04;
+      }
+
+      // precio
+      const ptxt = fmtPrice(it.price);
+      if (ptxt) {
+        const full = (st.cur ? st.cur.trim() + " " : "") + ptxt;
+        const area = Math.max(foot - y, ch * 0.2);
+        fit(x, full, "900", area * 0.88, cw);
+        x.fillStyle = acc; x.textBaseline = "middle";
+        x.fillText(full, mid, y + area / 2 + area * 0.04);
+      }
+      x.restore();
+    }
+
+    function renderPrev() {
+      const box = $("prPrev"); box.innerHTML = "";
+      const dpr = window.devicePixelRatio || 1;
+      const cssW = Math.min(230, box.clientWidth ? box.clientWidth - 20 : 230);
+      const k = cssW / st.w;
+      const list = st.items.filter(it => it.name || it.price);
+      if (!list.length) { box.innerHTML = '<div class="empty">Agregá un producto para ver la etiqueta.</div>'; }
+      list.forEach(it => {
+        const c = document.createElement("canvas");
+        c.width = Math.round(st.w * k * dpr); c.height = Math.round(st.h * k * dpr);
+        c.style.width = st.w * k + "px"; c.style.height = st.h * k + "px";
+        if (st.round) c.style.borderRadius = 2 * k + "px";
+        drawTag(c.getContext("2d"), k * dpr, it, 0);
+        const d = document.createElement("div"); d.className = "pv"; d.appendChild(c);
+        const q = Math.max(1, +it.q || 1);
+        if (q > 1) { const b = document.createElement("span"); b.className = "qb"; b.textContent = "×" + q; d.appendChild(b); }
+        box.appendChild(d);
+      });
+      const n = list.reduce((a, it) => a + Math.max(1, +it.q || 1), 0);
+      const bl = st.cut ? BLEED * 2 : 0;
+      const cols = Math.max(1, Math.floor((190 + 3) / (st.w + bl + 3))), rows = Math.max(1, Math.floor((277 + 3) / (st.h + bl + 3)));
+      $("prTotal").textContent = n + (n === 1 ? " etiqueta" : " etiquetas") + " · entran " + cols * rows + " por hoja A4";
+    }
+
+    function renderList() {
+      const box = $("prList"); box.innerHTML = "";
+      st.items.forEach((it, i) => {
+        const row = document.createElement("div"); row.className = "pritem";
+        const inp = (key, ph, cls, type) => {
+          const e = document.createElement("input");
+          e.placeholder = ph; e.value = it[key] ?? ""; e.autocomplete = "off";
+          if (cls) e.className = cls;
+          if (type) { e.type = type; if (type === "number") { e.min = 1; e.max = 200; } }
+          e.oninput = () => { it[key] = type === "number" ? Math.max(1, Math.min(200, +e.value || 1)) : e.value; changed(); };
+          return e;
+        };
+        row.appendChild(inp("name", "Nombre (ej: Llavero vinilo)", "wide"));
+        row.appendChild(inp("detail", "Detalle opcional (ej: con NFC)", "wide"));
+        const price = inp("price", "Precio (ej: 5000)"); price.inputMode = "decimal";
+        row.appendChild(price);
+        const q = document.createElement("div"); q.className = "qrow";
+        const qi = inp("q", "Cant.", "", "number"); qi.title = "Cantidad a imprimir";
+        const del = document.createElement("button"); del.className = "del"; del.textContent = "🗑"; del.title = "Quitar";
+        del.onclick = () => { st.items.splice(i, 1); renderList(); changed(); };
+        q.appendChild(qi); q.appendChild(del); row.appendChild(q);
+        box.appendChild(row);
+      });
+      if (!st.items.length) box.innerHTML = '<div class="empty">No hay productos todavía.</div>';
+    }
+
+    function addItem(it) {
+      st.items.push(Object.assign({ name: "", detail: "", price: "", q: 1 }, it));
+      renderList(); changed();
+      const ins = $("prList").querySelectorAll(".pritem");
+      const last = ins[ins.length - 1];
+      if (last) { const e = last.querySelector(it.name ? "input:nth-child(3)" : "input"); e && e.focus(); }
+    }
+
+    function fillHist() {
+      const sel = $("prHist");
+      sel.innerHTML = '<option value="">… o agregar uno de «Mis llaveros»</option>';
+      loadHist().forEach((e, i) => {
+        const o = document.createElement("option"); o.value = i;
+        o.textContent = (e.svc === "s" ? "🟢 " : "🔴 ") + (e.name || e.title || e.id);
+        sel.appendChild(o);
+      });
+    }
+    $("prHist").onchange = e => {
+      const h = loadHist()[+e.target.value]; e.target.value = "";
+      if (!h) return;
+      const lastPrice = st.items.length ? st.items[st.items.length - 1].price : "";
+      addItem({ name: h.name || h.title || "Llavero vinilo", detail: "Llavero vinilo NFC", price: lastPrice });
+    };
+    $("prAdd").onclick = () => addItem({});
+
+    function seg(boxId, attr, key, after) {
+      document.querySelectorAll("#" + boxId + " button").forEach(b => b.onclick = () => {
+        st[key] = b.dataset[attr]; if (after) after(st[key]); syncUI(); changed();
+      });
+    }
+    seg("prSize", "sz", "sz", v => { if (v !== "custom") { const [w, h] = v.split("x").map(Number); st.w = w; st.h = h; } });
+    seg("prBg", "bg", "bg");
+    ["W", "H"].forEach(K => $("pr" + K).oninput = e => {
+      const v = +e.target.value; if (v >= 15 && v <= 150) { st[K.toLowerCase()] = v; changed(); }
+    });
+    $("prCur").oninput = e => { st.cur = e.target.value; changed(); };
+    [["prLogo", "logo"], ["prIg", "ig"], ["prHole", "hole"], ["prRound", "round"], ["prCut", "cut"]]
+      .forEach(([id, key]) => $(id).onchange = e => { st[key] = e.target.checked; changed(); });
+
+    function colorSwatches() {
+      const box = $("prColor"); box.innerHTML = "";
+      PCOLORS.forEach(c => {
+        const b = document.createElement("button"); b.className = "sw" + (st.color === c ? " on" : "");
+        b.style.background = c; b.onclick = () => { st.color = c; colorSwatches(); changed(); };
+        box.appendChild(b);
+      });
+      const p = document.createElement("label"); p.className = "sw pick" + (PCOLORS.includes(st.color) ? "" : " on");
+      const i = document.createElement("input"); i.type = "color"; i.value = st.color;
+      i.oninput = () => { st.color = i.value; changed(); };
+      i.onchange = () => colorSwatches();
+      p.appendChild(i); box.appendChild(p);
+    }
+
+    function syncUI() {
+      document.querySelectorAll("#prSize button").forEach(b => b.classList.toggle("on", b.dataset.sz === st.sz));
+      document.querySelectorAll("#prBg button").forEach(b => b.classList.toggle("on", b.dataset.bg === st.bg));
+      $("prCustom").classList.toggle("hidden", st.sz !== "custom");
+      $("prW").value = st.w; $("prH").value = st.h; $("prCur").value = st.cur;
+      $("prLogo").checked = st.logo; $("prIg").checked = st.ig; $("prHole").checked = st.hole;
+      $("prRound").checked = st.round; $("prCut").checked = st.cut;
+      colorSwatches();
+    }
+
+    function exportItem(it) {
+      const k = DPI / 25.4, bl = st.cut ? BLEED : 0;
+      const c = document.createElement("canvas");
+      c.width = Math.round((st.w + 2 * bl) * k); c.height = Math.round((st.h + 2 * bl) * k);
+      drawTag(c.getContext("2d"), k, it, bl);
+      return new Promise(r => c.toBlob(r, "image/png"));
+    }
+    const ready = () => st.items.filter(it => it.name || it.price);
+
+    $("prPrint").onclick = async () => {
+      const list = ready();
+      if (!list.length) { alert("Agregá al menos un producto."); return; }
+      const w = window.open("", "_blank");
+      if (!w) { alert("El navegador bloqueó la ventana. Permití las ventanas emergentes y probá de nuevo."); return; }
+      const bl = st.cut ? BLEED : 0, W = st.w + 2 * bl, H = st.h + 2 * bl;
+      let items = "";
+      for (const it of list) {
+        const url = URL.createObjectURL(await exportItem(it));
+        for (let i = 0; i < Math.max(1, +it.q || 1); i++)
+          items += '<div class="it"><img src="' + url + '" alt="">' + (st.cut ? '<div class="cut"></div>' : "") + "</div>";
+      }
+      w.document.write('<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">' +
+        "<title>Etiquetas de precio - " + st.w + "x" + st.h + " mm</title><style>" +
+        "@page{size:A4;margin:10mm}body{margin:0;padding:10mm;font-family:system-ui,sans-serif}" +
+        ".info{font-size:12px;color:#555;margin:0 0 5mm}.grid{display:flex;flex-wrap:wrap;gap:3mm}" +
+        ".it{position:relative;width:" + W + "mm;height:" + H + "mm;break-inside:avoid}" +
+        ".it img{width:100%;height:100%;display:block}" +
+        ".cut{position:absolute;inset:" + bl + "mm;border-radius:" + (st.round ? 1.8 : 0) + "mm;border:.25mm dashed #888}" +
+        "@media print{body{padding:0}.info{display:none}}</style></head><body>" +
+        '<p class="info">Etiquetas de ' + st.w + " × " + st.h + " mm. Imprimí al 100 % / tamaño real (sin “ajustar a la página”).</p>" +
+        '<div class="grid">' + items + "</div>" +
+        "<script>window.onload=function(){setTimeout(function(){print()},400)}<\/script></body></html>");
+      w.document.close();
+    };
+    $("prPng").onclick = async () => {
+      const list = ready();
+      for (let i = 0; i < list.length; i++) {
+        const url = URL.createObjectURL(await exportItem(list[i]));
+        const nm = (list[i].name || "etiqueta").toLowerCase().replace(/[^a-z0-9áéíóúñ]+/gi, "-").replace(/^-|-$/g, "");
+        downloadDataUrl(url, "precio-" + (nm || "etiqueta") + ".png");
+        setTimeout(() => URL.revokeObjectURL(url), 5000);
+        await new Promise(r => setTimeout(r, 400));
+      }
+    };
+
+    syncUI(); renderList();
+    return { refresh() { fillHist(); renderPrev(); } };
+  })();
+
   let startTab = "link";
   try { startTab = localStorage.getItem(TKEY) || "link"; } catch {}
-  showTab(startTab === "editor" ? "editor" : "link");
+  showTab(["editor", "precios"].includes(startTab) ? startTab : "link");
 
   renderHist();
 </script>
